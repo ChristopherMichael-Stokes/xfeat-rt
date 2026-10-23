@@ -9,14 +9,16 @@ backends and the pipeline run the exported models without PyTorch.
 | Path         | uv workspace | Holds                                                     |
 | ------------ | ------------ | --------------------------------------------------------- |
 | `reference/` | yes          | PyTorch reference implementation and model export         |
-| `runtime/`   | yes          | Inference backends and pipeline/glue code; no PyTorch     |
+| `runtime/`   | yes          | Shared core wheel (metadata, glue, benchmark harness); no PyTorch |
+| `backends/<name>/` | no, one uv project each | One inference backend per directory; own lock, `.venv` and Python pin; never installed together |
 | `agent-docs/` | no          | Docs written by and for agents: briefs, plans, research reports |
 | root         | no           | Shared checks (`prek.toml`), `ruff.toml`, `Makefile`      |
 
 - Each workspace has its own `uv.lock` and `.venv`. Members live at
   `<workspace>/packages/<dist-name>/src/<module>/` and are picked up by the `packages/*` glob.
+- Backends consume `runtime/` packages by path in development and as built wheels elsewhere.
 - The workspaces meet only through exported model files. Test that contract by exporting with
-  `reference` and loading with `runtime`.
+  `reference` and loading with a backend.
 
 ## Agent docs
 
@@ -29,8 +31,8 @@ backends and the pipeline run the exported models without PyTorch.
 
 ## Hard constraints
 
-- **`runtime/` never depends on PyTorch**, directly or transitively. Check `runtime/uv.lock` after
-  adding a dependency.
+- **`runtime/` and `backends/` never depend on PyTorch**, directly or transitively. Check the
+  affected `uv.lock` after adding a dependency.
 - **Exported models are build outputs.** Regenerate them from `reference`; never commit them
   (`.gitignore` covers the usual formats).
 - **Existing XFeat/LighterGlue code outside this repo is reference material only.** Read it to
