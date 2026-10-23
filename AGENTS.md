@@ -10,12 +10,22 @@ backends and the pipeline run the exported models without PyTorch.
 | ------------ | ------------ | --------------------------------------------------------- |
 | `reference/` | yes          | PyTorch reference implementation and model export         |
 | `runtime/`   | yes          | Inference backends and pipeline/glue code; no PyTorch     |
+| `agent-docs/` | no          | Docs written by and for agents: briefs, plans, research reports |
 | root         | no           | Shared checks (`prek.toml`), `ruff.toml`, `Makefile`      |
 
 - Each workspace has its own `uv.lock` and `.venv`. Members live at
   `<workspace>/packages/<dist-name>/src/<module>/` and are picked up by the `packages/*` glob.
 - The workspaces meet only through exported model files. Test that contract by exporting with
   `reference` and loading with `runtime`.
+
+## Agent docs
+
+- `agent-docs/` holds session briefs, plans and research reports for agents. Human-facing docs
+  (`README.md`, any `docs/`) never link into it, and agent material never goes in them.
+- A brief is self-contained: a fresh session runs it with no access to the conversation that
+  wrote it.
+- Plans and reports a session produces land in `agent-docs/` beside the brief that asked for
+  them.
 
 ## Hard constraints
 
