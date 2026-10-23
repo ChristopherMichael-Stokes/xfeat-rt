@@ -1,0 +1,14 @@
+[dependency-groups]
+dev = ["ty>=0.0.91"]
+
+[tool.ty.environment]
+python-version = "3.13"
+
+[tool.ty.rules]
+all = "error"
+
+[tool.ty.analysis]
+respect-type-ignore-comments = false
+
+[tool.uv.workspace]
+members = ["packages/*"]

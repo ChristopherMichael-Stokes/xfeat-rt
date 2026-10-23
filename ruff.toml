@@ -1,0 +1,31 @@
+line-length = 100
+target-version = "py313"
+src = ["reference/packages/*/src", "runtime/packages/*/src"]
+
+[lint]
+select = ["ALL"]
+ignore = [
+  # conflict with the formatter
+  "COM812",
+  "COM819",
+  "ISC001",
+  # incompatible with D211 / D212, which are kept
+  "D203",
+  "D213",
+  "CPY001",
+  # pandas rules misfire on numpy arrays and torch tensors (.values, .T)
+  "PD",
+  # single-letter math names (K, R, H, T) are idiomatic in vision code
+  "N803",
+  "N806",
+  "TD002",
+  "TD003",
+  "FIX002",
+]
+
+[lint.pydocstyle]
+convention = "google"
+
+[lint.per-file-ignores]
+"**/tests/**" = ["S101", "PLR2004", "D1", "SLF001", "INP001", "ANN"]
+"**/*.ipynb" = ["T201", "D100", "D103", "E402", "INP001", "B018", "ERA001"]

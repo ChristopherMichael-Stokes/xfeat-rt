@@ -1,0 +1,21 @@
+.venv/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+.rumdl_cache/
+.pytest_cache/
+dist/
+build/
+*.egg-info/
+
+.ipynb_checkpoints/
+uncommitted/
+
+# exported models are build outputs, regenerated from the reference
+*.onnx
+*.engine
+*.plan
+*.mlpackage/
+*.mlmodel
+*.pt
+*.pth

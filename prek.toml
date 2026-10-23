@@ -1,0 +1,153 @@
+minimum_prek_version = "0.5.7"
+default_install_hook_types = ["pre-commit"]
+default_language_version = { python = "3.13" }
+
+[[repos]]
+repo = "builtin"
+
+[[repos.hooks]]
+id = "trailing-whitespace"
+
+[[repos.hooks]]
+id = "end-of-file-fixer"
+
+[[repos.hooks]]
+id = "mixed-line-ending"
+args = ["--fix=lf"]
+
+[[repos.hooks]]
+id = "fix-byte-order-marker"
+
+[[repos.hooks]]
+id = "check-added-large-files"
+args = ["--maxkb=1024"]
+
+[[repos.hooks]]
+id = "check-case-conflict"
+
+[[repos.hooks]]
+id = "check-illegal-windows-names"
+
+[[repos.hooks]]
+id = "check-merge-conflict"
+args = ["--assume-in-merge"]
+
+[[repos.hooks]]
+id = "check-symlinks"
+
+[[repos.hooks]]
+id = "destroyed-symlinks"
+
+[[repos.hooks]]
+id = "check-executables-have-shebangs"
+
+[[repos.hooks]]
+id = "check-shebang-scripts-are-executable"
+
+[[repos.hooks]]
+id = "check-json"
+
+[[repos.hooks]]
+id = "detect-private-key"
+
+[[repos]]
+repo = "https://github.com/gitleaks/gitleaks"
+rev = "v8.30.1"
+
+[[repos.hooks]]
+id = "gitleaks"
+
+[[repos]]
+repo = "https://github.com/crate-ci/typos"
+rev = "v1.51.1"
+
+[[repos.hooks]]
+id = "typos"
+
+[[repos]]
+repo = "https://github.com/astral-sh/ruff-pre-commit"
+rev = "v0.17.2"
+
+[[repos.hooks]]
+id = "ruff-check"
+args = ["--fix"]
+
+[[repos.hooks]]
+id = "ruff-format"
+
+[[repos]]
+repo = "https://github.com/kynan/nbstripout"
+rev = "0.9.1"
+
+[[repos.hooks]]
+id = "nbstripout"
+args = ["--drop-empty-cells", "--extra-keys=metadata.language_info"]
+
+[[repos]]
+repo = "https://github.com/abravalheri/validate-pyproject"
+rev = "v0.27"
+
+[[repos.hooks]]
+id = "validate-pyproject"
+files = '(^|/)pyproject\.toml$'
+additional_dependencies = ["validate-pyproject-schema-store[all]"]
+
+[[repos]]
+repo = "https://github.com/tombi-toml/tombi-pre-commit"
+rev = "v1.9.1"
+
+[[repos.hooks]]
+id = "tombi-format"
+exclude = '(^|/)uv\.lock$'
+
+[[repos.hooks]]
+id = "tombi-lint"
+exclude = '(^|/)uv\.lock$'
+
+[[repos]]
+repo = "https://github.com/adrienverge/yamllint"
+rev = "v1.38.0"
+
+[[repos.hooks]]
+id = "yamllint"
+
+[[repos]]
+repo = "https://github.com/rvben/rumdl-pre-commit"
+rev = "v0.3.0"
+
+[[repos.hooks]]
+id = "rumdl-fmt"
+
+[[repos.hooks]]
+id = "rumdl-check"
+
+[[repos]]
+repo = "https://github.com/EbodShojaei/bake"
+rev = "v1.4.6"
+
+[[repos.hooks]]
+id = "mbake-format"
+
+[[repos.hooks]]
+id = "mbake-validate"
+
+[[repos]]
+repo = "https://github.com/checkmake/checkmake"
+rev = "v0.3.2"
+
+[[repos.hooks]]
+id = "checkmake"
+
+[[repos]]
+repo = "https://github.com/shellcheck-py/shellcheck-py"
+rev = "v0.11.0.1"
+
+[[repos.hooks]]
+id = "shellcheck"
+
+[[repos]]
+repo = "https://github.com/scop/pre-commit-shfmt"
+rev = "v3.14.1-1"
+
+[[repos.hooks]]
+id = "shfmt"

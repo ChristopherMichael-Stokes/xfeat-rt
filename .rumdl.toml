@@ -1,0 +1,6 @@
+[global]
+line-length = 100
+
+[per-file-ignores]
+# Claude Code import line, not prose
+"CLAUDE.md" = ["MD041"]

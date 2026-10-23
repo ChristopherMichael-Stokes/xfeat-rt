@@ -1,0 +1,3 @@
+[default.extend-words]
+# ruff rule prefix for flake8-copyright
+CPY = "CPY"
