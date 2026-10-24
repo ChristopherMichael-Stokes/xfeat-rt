@@ -16,6 +16,8 @@ import torch
 from torch import nn
 from torch.nn import functional
 
+from xfeat_export.precision import Precision
+
 NMS_KERNEL = 5
 """Upstream `XFeat.NMS` kernel size."""
 HEATMAP_CELL = 8
@@ -130,10 +132,12 @@ class StaticXFeat(nn.Module):
         top_k: int,
         detection_threshold: float,
         chunking: ChunkedTopK | None,
+        precision: Precision,
     ) -> None:
         """Wrap `network` (a copy is patched, the argument is left unchanged)."""
         super().__init__()
-        self.network = _with_pixel_unshuffle(network)
+        self.network = _with_pixel_unshuffle(network).to(precision.dtype)
+        self.compute_dtype = precision.dtype
         self.height, self.width, self.top_k = height, width, top_k
         self.detection_threshold = detection_threshold
         self.chunking = chunking
@@ -143,7 +147,9 @@ class StaticXFeat(nn.Module):
         self, image: torch.Tensor
     ) -> tuple[torch.Tensor, ...]:
         """Run the graph on `image`."""
-        features, logits, reliability = self.network(image)
+        features, logits, reliability = (
+            output.to(torch.float32) for output in self.network(image.to(self.compute_dtype))
+        )
         features = functional.normalize(features, dim=1)
         heatmap = functional.pixel_shuffle(functional.softmax(logits, 1)[:, :64], HEATMAP_CELL)
         peaks = peak_mask(heatmap, self.detection_threshold)

@@ -23,6 +23,7 @@ class XFeatMetadata(BaseModel):
         topk_mode: `chunked` when no `TopK` node exceeds `max_k_per_op`.
         chunk_size: Score-map elements per chunk, chunked mode only.
         max_k_per_op: Largest K of one `TopK` node, chunked mode only.
+        precision: Precision of the backbone; graph inputs and outputs are FP32 either way.
         opset: ONNX opset of the file.
         weights_sha256: SHA-256 of the pinned upstream weights.
         git_hash: Commit of this repository at export, `-dirty` with uncommitted changes.
@@ -40,6 +41,7 @@ class XFeatMetadata(BaseModel):
     topk_mode: Literal["plain", "chunked"]
     chunk_size: int | None = None
     max_k_per_op: int | None = None
+    precision: Literal["fp32", "fp16"]
     opset: int
     weights_sha256: str
     git_hash: str
@@ -52,6 +54,7 @@ class LighterGlueMetadata(BaseModel):
         batch: Pairs per call.
         top_k: Keypoints per image the inputs are padded to.
         match_threshold: Minimum match confidence.
+        precision: Precision of the transformer; the assignment head is FP32 either way.
         pruning: LighterGlue point pruning; the exported graph has none.
         opset: ONNX opset of the file.
         weights_sha256: SHA-256 of the pinned upstream weights.
@@ -64,6 +67,7 @@ class LighterGlueMetadata(BaseModel):
     batch: int
     top_k: int
     match_threshold: float
+    precision: Literal["fp32", "fp16"]
     pruning: Literal["off"]
     opset: int
     weights_sha256: str

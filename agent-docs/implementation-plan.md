@@ -1,6 +1,6 @@
 # Implementation plan: xfeat-rt
 
-Status: C0 to C2 done (`c2-results.md`); C3 design in `c3-plan.md`, awaiting approval. Evidence
+Status: C0 to C3 done (`c2-results.md`, `c3-plan.md`, `c3-results.md`). Evidence
 lives in `research-01-method.md` to `research-05-measurement.md` beside this file.
 
 ## Targets
@@ -165,7 +165,7 @@ when a native Linux box is available.
 | C0 | Reference pipeline                          | Gate 0 AUC reproduced; `upstream_exact` vs default config measured    |
 | C1 | Spike (below)                               | Go/no-go on in-graph post-processing, pruning delta, TensorRT install |
 | C2 | Export, `xfeat-core`, `backends/ort`, contract test, harness (WSL2 CPU) | Cross-workspace test passes; first CPU latency table |
-| C3 | `backends/tensorrt` (WSL2 GPU), custom pair loader | CUDA latency table, engine cache, eval on your own pairs        |
+| C3 | `backends/tensorrt` (WSL2 GPU), custom pair loader | Done: CUDA latency tables (FP32, FP16), engine cache, `xfeat-score` on MegaDepth-1500 and own pairs |
 | C4 | Offline throughput                          | Separate batch-B engines (a batch-2 profile slowed batch-1 by 13-16% in vision-rt) |
 | C5 | Pi 5 and M2 Mac                             | Arm and CoreML EP tables                                              |
 | C6 | Ablations                                   | Accuracy vs latency across precision, resolution, K                   |
@@ -206,7 +206,7 @@ prediction-file format are the hooks it will build on.
 | U4 | ORT CoreML EP share of each graph on ANE/GPU                            | M2 Mac run with EP profiling                                         |
 | U5 | Pi 5: ORT vs OpenVINO                                                   | Latency on Pi 5 16 GB with throttle state logged                        |
 | U6 | Orin NX support on the latest JetPack at that time; container Python version and TensorRT bindings | Container smoke test on the Orin NX with the latest JetPack                       |
-| U7 | FP16 and INT8 accuracy (robofans: XFeat FP16 -2 AUC@5, no speedup)      | Ablation in C6                                                    |
+| U7 | FP16 and INT8 accuracy (robofans: XFeat FP16 -2 AUC@5, no speedup)      | FP16 measured in C3 (AUC within 0.0024 of FP32, LighterGlue 2.7x faster at K = 4096); INT8 and confidence intervals in C6 |
 | U8 | Largest K per device inside the latency budget; LighterGlue attention cost at K = 2048 and 4096 (about 4x per doubling on CPU) | K sweep from C2 onward on each device, XFeat and LighterGlue timed separately |
 | U9 | Chunked TopK on TensorRT at K = 4096: builds, matches the reference, cost | TensorRT build and set-level comparison in C1                     |
 

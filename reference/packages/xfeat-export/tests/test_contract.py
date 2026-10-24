@@ -17,6 +17,7 @@ import pytest
 import torch
 
 from xfeat_export.cli import export_lighterglue, export_xfeat
+from xfeat_export.precision import Precision
 from xfeat_export.xfeat_graph import DEFAULT_CHUNKING, ChunkedTopK
 from xfeat_pairs.predictions import read_index, read_pair
 from xfeat_reference.pipeline import (
@@ -141,9 +142,16 @@ def outcome(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFac
         top_k=case.top_k,
         batch=1,
         chunking=case.chunking,
+        precision=Precision.FP32,
     )
     lighterglue_path = export_lighterglue(
-        pipeline.lighterglue_network, work, top_k=case.top_k, batch=1, width=WIDTH, height=HEIGHT
+        pipeline.lighterglue_network,
+        work,
+        top_k=case.top_k,
+        batch=1,
+        width=WIDTH,
+        height=HEIGHT,
+        precision=Precision.FP32,
     )
 
     names = [

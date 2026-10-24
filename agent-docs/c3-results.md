@@ -128,3 +128,47 @@ are in `backends/tensorrt/uncommitted/bench/`.
   is 2 images at 6.5 ms each against 2.7 ms in the bench loop; host-side conversion between
   pairs and an idle GPU clock are the likely cause and were not investigated.
 - Raw predictions and scores: `reference/uncommitted/c3/full2048/`.
+
+## 3d: FP16 export and engines
+
+- `xfeat-export --precision fp16`: the XFeat backbone and the LighterGlue input projection and
+  transformer layers are converted to half precision in PyTorch before export. Detection (softmax,
+  NMS, TopK), descriptor sampling and normalisation, LighterGlue positional encoding and the
+  assignment head (log-softmax, log-sigmoid, mutual filter) stay FP32, and graph inputs and outputs
+  stay FP32, so backends and the prediction format are unchanged. Files carry an `_fp16` suffix and
+  `precision` in their metadata (new required key in `xfeat-core`).
+- The converter route of the C1 spike (`onnxconverter-common`) is not used: it produced invalid
+  graphs. Strongly typed TensorRT builds the half-precision layers on tensor cores and fuses the
+  explicit attention.
+
+### CUDA latency, FP32 vs FP16 (p50 ms of the engine, RTX 4070 Ti, WSL2, 1280x960, batch 1, chunked)
+
+| K | XFeat FP32 | XFeat FP16 | LighterGlue FP32 | LighterGlue FP16 | LighterGlue FP16, CUDA graph |
+| --- | --- | --- | --- | --- | --- |
+| 1024 | 1.56 | 1.06 | 3.85 | 3.29 | 0.82 |
+| 2048 | 1.83 | 1.30 | 5.10 | 4.28 | 1.81 |
+| 4096 | 1.90 | 1.53 | 22.99 | 8.42 | 7.84 |
+
+- FP16 LighterGlue at K = 4096 is 2.7x faster than FP32; at K = 1024 and 2048 the eager engine is
+  launch-bound and the CUDA graph takes it to 0.8 and 1.8 ms.
+- XFeat with graph: 0.78 / 0.99 / 1.20 ms at K = 1024 / 2048 / 4096.
+
+### MegaDepth-1500, all 1500 pairs, TensorRT, 1280x960 letterbox, scored at 640 long side
+
+| K | Precision | AUC@5 | AUC@10 | AUC@20 | mAA | Keypoint recall (min) | Match Jaccard (mean) | Matches per pair |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 2048 | FP32 (= reference) | 0.5626 | 0.7072 | 0.8157 | 0.6952 | 0.9998 | 0.9999 | 632.3 |
+| 2048 | FP16 | 0.5602 | 0.7069 | 0.8157 | 0.6943 | 0.9878 | 0.919 | 631.1 |
+| 4096 | FP32 | 0.5828 | 0.7251 | 0.8282 | 0.7120 | 1 | 1 | 1366.0 |
+| 4096 | FP16 | 0.5828 | 0.7249 | 0.8273 | 0.7117 | 0.9893 | 0.923 | 1364.1 |
+
+- FP16 costs at most 0.0024 AUC (at 5 degrees, K = 2048) and 0.0003 mAA at K = 4096, the size of
+  poselib's run-to-run spread (about 0.0005 between repeated scorings). The matches differ
+  (Jaccard 0.92) without a measurable loss of pose accuracy.
+- K = 4096 raises AUC@5 by 0.020 over K = 2048 (FP32 and FP16 alike), the first point of the K
+  sweep: FP16 TensorRT runs XFeat plus LighterGlue at K = 4096 in about 10 ms, 14 ms with
+  transfers.
+- The per-pair wall times in the score files varied 2x between runs on a busy machine (other jobs
+  ran concurrently) and are not latency results; the bench table above is.
+- Not done: bootstrap confidence intervals on the AUC differences (the plan's acceptance rule) and
+  the INT8 question.

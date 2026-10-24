@@ -6,12 +6,15 @@ MatMul/Softmax with an additive key mask (scaled dot-product attention, Vaswani 
 The dustbin row and column are not built because `filter_matches` never reads them.
 """
 
+import copy
 from typing import Any, override
 
 import torch
 from kornia.feature.lightglue import apply_cached_rotary_emb, normalize_keypoints
 from torch import nn
 from torch.nn import functional
+
+from xfeat_export.precision import Precision
 
 MASK_LOGIT = -30000.0
 """Additive mask for padded keypoints. Finite in FP16 (max 65504), so a row with every key masked
@@ -46,10 +49,22 @@ class StaticLighterGlue(nn.Module):
     `mscores0` (B, K), the match confidence (0 where unmatched or invalid).
     """
 
-    def __init__(self, lightglue: Any, match_threshold: float) -> None:  # noqa: ANN401  # kornia LightGlue
-        """Wrap a loaded kornia `LightGlue` network."""
+    def __init__(
+        self,
+        lightglue: Any,  # noqa: ANN401  # kornia LightGlue
+        match_threshold: float,
+        precision: Precision,
+    ) -> None:
+        """Wrap a loaded kornia `LightGlue` network (a copy is converted, the argument is kept).
+
+        At FP16 the input projection and the transformer layers run in half precision; positional
+        encoding and the assignment head stay FP32.
+        """
         super().__init__()
-        self.lightglue = lightglue.eval()
+        self.lightglue = copy.deepcopy(lightglue).eval()
+        self.lightglue.input_proj.to(precision.dtype)
+        self.lightglue.transformers.to(precision.dtype)
+        self.compute_dtype = precision.dtype
         self.match_threshold = match_threshold
 
     def _self_block(
@@ -105,16 +120,19 @@ class StaticLighterGlue(nn.Module):
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Run the matcher."""
         net = self.lightglue
-        encoding0 = net.posenc(normalize_keypoints(kpts0, size0))
-        encoding1 = net.posenc(normalize_keypoints(kpts1, size1))
-        x0, x1 = net.input_proj(desc0), net.input_proj(desc1)
-        bias0 = torch.where(valid0, 0.0, MASK_LOGIT)[:, None, None, :]
-        bias1 = torch.where(valid1, 0.0, MASK_LOGIT)[:, None, None, :]
+        dtype = self.compute_dtype
+        encoding0 = net.posenc(normalize_keypoints(kpts0, size0)).to(dtype)
+        encoding1 = net.posenc(normalize_keypoints(kpts1, size1)).to(dtype)
+        x0, x1 = net.input_proj(desc0.to(dtype)), net.input_proj(desc1.to(dtype))
+        bias0 = torch.where(valid0, 0.0, MASK_LOGIT).to(dtype)[:, None, None, :]
+        bias1 = torch.where(valid1, 0.0, MASK_LOGIT).to(dtype)[:, None, None, :]
         for layer in net.transformers:
             x0 = self._self_block(layer.self_attn, x0, encoding0, bias0)
             x1 = self._self_block(layer.self_attn, x1, encoding1, bias1)
             x0, x1 = self._cross_block(layer.cross_attn, x0, x1, bias0, bias1)
-        return self._assign(net.log_assignment[-1], x0, x1, valid0, valid1)
+        return self._assign(
+            net.log_assignment[-1], x0.to(torch.float32), x1.to(torch.float32), valid0, valid1
+        )
 
     def _assign(
         self,

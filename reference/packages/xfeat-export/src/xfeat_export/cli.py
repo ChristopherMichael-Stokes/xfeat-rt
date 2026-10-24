@@ -8,6 +8,7 @@ import torch
 from xfeat_export.lighterglue_graph import StaticLighterGlue
 from xfeat_export.metadata import git_description
 from xfeat_export.onnx_export import export_model
+from xfeat_export.precision import Precision
 from xfeat_export.xfeat_graph import DEFAULT_CHUNKING, ChunkedTopK, StaticXFeat
 from xfeat_reference.pipeline import GridNormalisation, ReferenceConfig, ReferencePipeline
 from xfeat_reference.upstream import LIGHTERGLUE_WEIGHTS_SHA256, XFEAT_WEIGHTS_SHA256
@@ -22,6 +23,10 @@ KEYPOINT_COORDINATES = 2
 DESCRIPTOR_DIMENSION = 64
 
 
+def _suffix(precision: Precision) -> str:
+    return "" if precision is Precision.FP32 else f"_{precision}"
+
+
 def export_xfeat(  # noqa: PLR0913  # one parameter per exported shape setting
     network: object,
     out_dir: Path,
@@ -31,6 +36,7 @@ def export_xfeat(  # noqa: PLR0913  # one parameter per exported shape setting
     top_k: int,
     batch: int,
     chunking: ChunkedTopK | None,
+    precision: Precision,
 ) -> Path:
     """Export the XFeat graph and return its path."""
     module = StaticXFeat(
@@ -40,8 +46,9 @@ def export_xfeat(  # noqa: PLR0913  # one parameter per exported shape setting
         top_k=top_k,
         detection_threshold=DETECTION_THRESHOLD,
         chunking=chunking,
+        precision=precision,
     )
-    path = out_dir / f"xfeat_{width}x{height}_k{top_k}_b{batch}.onnx"
+    path = out_dir / f"xfeat_{width}x{height}_k{top_k}_b{batch}{_suffix(precision)}.onnx"
     metadata = {
         "model": "xfeat",
         "height": str(height),
@@ -51,6 +58,7 @@ def export_xfeat(  # noqa: PLR0913  # one parameter per exported shape setting
         "detection_threshold": str(DETECTION_THRESHOLD),
         "grid": str(GRID),
         "topk_mode": "chunked" if chunking else "plain",
+        "precision": str(precision),
         "weights_sha256": XFEAT_WEIGHTS_SHA256,
         "git_hash": git_description(),
     }
@@ -71,11 +79,18 @@ def export_xfeat(  # noqa: PLR0913  # one parameter per exported shape setting
 
 
 def export_lighterglue(  # noqa: PLR0913  # shape settings of the paired XFeat export
-    network: object, out_dir: Path, *, top_k: int, batch: int, width: int, height: int
+    network: object,
+    out_dir: Path,
+    *,
+    top_k: int,
+    batch: int,
+    width: int,
+    height: int,
+    precision: Precision,
 ) -> Path:
     """Export the padded LighterGlue graph and return its path."""
-    module = StaticLighterGlue(network, MATCH_THRESHOLD)
-    path = out_dir / f"lighterglue_k{top_k}_b{batch}.onnx"
+    module = StaticLighterGlue(network, MATCH_THRESHOLD, precision)
+    path = out_dir / f"lighterglue_k{top_k}_b{batch}{_suffix(precision)}.onnx"
     example: list[torch.Tensor] = []
     names: list[str] = []
     for side in (0, 1):
@@ -91,6 +106,7 @@ def export_lighterglue(  # noqa: PLR0913  # shape settings of the paired XFeat e
         "batch": str(batch),
         "top_k": str(top_k),
         "match_threshold": str(MATCH_THRESHOLD),
+        "precision": str(precision),
         "pruning": "off",
         "weights_sha256": LIGHTERGLUE_WEIGHTS_SHA256,
         "git_hash": git_description(),
@@ -118,6 +134,13 @@ def main() -> None:
         action="store_true",
         help="split TopK so no node exceeds K=2048 (TensorRT builds K <= 3840 only)",
     )
+    parser.add_argument(
+        "--precision",
+        type=Precision,
+        choices=list(Precision),
+        default=Precision.FP32,
+        help="backbone and transformer precision; detection and assignment stay FP32",
+    )
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -134,6 +157,7 @@ def main() -> None:
             top_k=args.top_k,
             batch=args.batch,
             chunking=chunking,
+            precision=args.precision,
         ),
         export_lighterglue(
             pipeline.lighterglue_network,
@@ -142,6 +166,7 @@ def main() -> None:
             batch=args.batch,
             width=args.width,
             height=args.height,
+            precision=args.precision,
         ),
     ):
         print(path)  # noqa: T201  # CLI output
