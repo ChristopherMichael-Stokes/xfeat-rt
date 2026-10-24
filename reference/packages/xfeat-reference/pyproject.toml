@@ -1,0 +1,13 @@
+[project]
+name = "xfeat-reference"
+version = "0.1.0"
+description = "Pinned upstream XFeat and kornia LighterGlue wrapped as the reference pipeline."
+requires-python = ">=3.13"
+dependencies = [
+  "kornia==0.8.3",
+  "torch>=2.14.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"

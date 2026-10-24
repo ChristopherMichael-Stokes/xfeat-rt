@@ -9,7 +9,17 @@ files = '(^|/)pyproject\.toml$|^uv\.lock$'
 [[repos.hooks]]
 id = "uv-audit"
 files = '(^|/)pyproject\.toml$|^uv\.lock$'
-args = ["--preview-features", "audit-command"]
+# setuptools stays <81 for gluefactory's pkg_resources import, used at runtime only. These
+# advisories cover sdist builds on macOS APFS/HFS+ (PYSEC-2026-3447) and legacy wheel installs on
+# Windows (GHSA-xmj3-9gf7-h52w), neither of which this workspace does.
+args = [
+  "--preview-features",
+  "audit-command",
+  "--ignore",
+  "PYSEC-2026-3447",
+  "--ignore",
+  "GHSA-xmj3-9gf7-h52w",
+]
 
 [[repos]]
 repo = "local"

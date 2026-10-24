@@ -53,6 +53,8 @@ Run from the repo root unless a workspace is named.
 | Update hook revisions        | `make update-hooks` (skips releases under 7 days old)  |
 | Types in one workspace       | `uv run --frozen ty check` from `reference/` or `runtime/` |
 | Add a dependency to a member | `uv add --package <dist-name> <dep>` from the workspace |
+| Reference tests              | `uv run --frozen pytest packages` from `reference/`    |
+| MegaDepth-1500 AUC           | `uv run --frozen xfeat-megadepth1500 --grid pixel_centre --no-pruning --output-dir uncommitted/megadepth1500/<run>` from `reference/` (`--help` for device, K, resize) |
 
 ## Checks
 
