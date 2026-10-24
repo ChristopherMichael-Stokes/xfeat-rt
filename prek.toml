@@ -94,7 +94,7 @@ additional_dependencies = ["validate-pyproject-schema-store[all]"]
 
 [[repos]]
 repo = "https://github.com/tombi-toml/tombi-pre-commit"
-rev = "v1.9.1"
+rev = "v1.9.3"
 
 [[repos.hooks]]
 id = "tombi-format"
@@ -140,7 +140,7 @@ id = "checkmake"
 
 [[repos]]
 repo = "https://github.com/shellcheck-py/shellcheck-py"
-rev = "v0.11.0.1"
+rev = "v0.11.0.1-1"
 
 [[repos.hooks]]
 id = "shellcheck"
