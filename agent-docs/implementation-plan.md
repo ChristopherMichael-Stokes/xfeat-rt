@@ -1,7 +1,7 @@
 # Implementation plan: xfeat-rt
 
-Status: awaiting approval. Evidence lives in `research-01-method.md` to `research-05-measurement.md`
-beside this file. Nothing is built.
+Status: C0 to C2 done (`c2-results.md`); C3 design in `c3-plan.md`, awaiting approval. Evidence
+lives in `research-01-method.md` to `research-05-measurement.md` beside this file.
 
 ## Targets
 
@@ -43,14 +43,15 @@ beside this file. Nothing is built.
 
 | Package       | Holds                                                                               |
 | ------------- | ----------------------------------------------------------------------------------- |
-| `xfeat-core`  | Metadata read-back, result types, NumPy glue (valid-mask compaction, rescale, match pairs), prediction-file writer; depends only on `numpy` |
+| `xfeat-core`  | Metadata read-back, result types, NumPy glue (valid-mask compaction, rescale, match pairs); depends on `numpy` and `pydantic` |
+| `xfeat-pairs` | (C3) Pair manifest, image loading and preprocessing, prediction-directory writer and reader; `numpy`, `pydantic`, `opencv-python-headless` |
 | `xfeat-bench` | Benchmark harness: explicit per-backend sync, `perf_counter_ns`, percentiles from raw samples, JSON results |
 
 `backends/<name>/` (one independent uv project each, own `uv.lock`, `.venv` and Python pin):
 
 | Project          | Runtime dependency                           | Devices                       |
 | ---------------- | -------------------------------------------- | ----------------------------- |
-| `backends/tensorrt` | `tensorrt-cu13`, `cuda-python`            | NVIDIA CUDA (first, WSL2 dev) |
+| `backends/tensorrt` | `tensorrt-cu13` (libs pinned to the NVIDIA index for a hashed lock), `cuda-python` (`cuda.core`) | NVIDIA CUDA (first, WSL2 dev) |
 | `backends/ort`   | `onnxruntime`                                | x86 CPU, Raspberry Pi 5, Apple (CoreML EP) |
 | `backends/openvino` | `openvino`                                | CPU ablation                  |
 | `backends/jetson` | system TensorRT of the latest JetPack| Orin NX, in an NGC/CUDA container |
@@ -78,13 +79,14 @@ beside this file. Nothing is built.
 - Pruning and early exit stay off, as in every prior port. A masked static version cannot speed
   anything up, and no exported pruning exists anywhere (research 04).
 - Disagreement with research 02, which put NMS and top-k outside the graph: outside forces a GPU
-  to host copy of the 1.2 Mpx heatmap on CUDA and leaves the CPU's dominant cost (the 5x5
-  max-pool, about 55 ms at 1280x960) to NumPy instead of a tuned ORT or TensorRT kernel.
+  to host copy of the 1.2 Mpx heatmap on CUDA. The C1 spike measured in-graph NMS at about 2 ms on
+  ORT CPU (the 55 ms attributed to max-pool was dense `GridSample`, replaced by `Resize`).
   Fallback if the spike fails on a backend: backbone-only graph with NumPy post-processing
   (precedent: BCDL port, kornia/vision-rt).
 - Risks in the in-graph route: dense bilinear sampling costs more than sampling candidates only;
   tie order differs from argsort, so keypoints are compared as sets.
-- TensorRT `TopK` requires K < 3840, which rules out the 4096 offline floor. Chunked top-K (as
+- TensorRT `TopK` requires K <= 3840 (measured; K = 3841 and 4096 fail), which rules out the 4096
+  offline floor. Chunked top-K (as
   fabio-sim does, 39.5 to 4.1 ms in their report) is therefore required on TensorRT, not an
   option; the spike checks it builds and matches at K = 2048 and 4096, and records the largest K
   that builds if 4096 does not.
