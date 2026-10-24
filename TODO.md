@@ -2,10 +2,10 @@
 
 ## Reference
 
-- [ ] Pinned XFeat and LighterGlue pipeline
-- [ ] Reproduce published MegaDepth-1500 AUC
-- [ ] Measure pruning on vs off
-- [ ] Measure edge-row fix vs upstream
+- [x] Pinned XFeat and LighterGlue pipeline
+- [x] Reproduce published MegaDepth-1500 AUC
+- [x] Measure pruning on vs off
+- [x] Measure edge-row fix vs upstream
 
 ## Export
 
