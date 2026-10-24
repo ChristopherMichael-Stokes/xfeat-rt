@@ -1950,6 +1950,7 @@ dependencies = [
     { name = "poselib" },
     { name = "setuptools" },
     { name = "tqdm" },
+    { name = "xfeat-core" },
     { name = "xfeat-pairs" },
     { name = "xfeat-reference" },
 ]
@@ -1964,6 +1965,7 @@ requires-dist = [
     { name = "poselib", specifier = ">=2.0.5" },
     { name = "setuptools", specifier = ">=80.10.2" },
     { name = "tqdm", specifier = ">=4.70.1" },
+    { name = "xfeat-core", editable = "../runtime/packages/xfeat-core" },
     { name = "xfeat-pairs", editable = "../runtime/packages/xfeat-pairs" },
     { name = "xfeat-reference", editable = "packages/xfeat-reference" },
 ]

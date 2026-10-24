@@ -97,3 +97,34 @@ are in `backends/tensorrt/uncommitted/bench/`.
   set by up to 156 per image (near-tied candidates); the loader resizes RGB first.
 - `xfeat-evaluation` depends on `xfeat-pairs` by path; `reference/uv.lock` resolves it under the
   `numpy<2.4` override.
+
+## 3c: `xfeat-score`, reference predictions, own-pair scoring
+
+- `xfeat-megadepth1500-manifest` writes the 1500 MegaDepth-1500 pairs with relative-pose ground
+  truth (`pairs_calibrated.txt`: K0, K1 at original resolution, R and t row-major).
+- `xfeat-reference-predict` runs the PyTorch reference over a manifest with the backends'
+  preprocessing, canvas and K, writing the same prediction directory.
+- `xfeat-score` scores a prediction directory with GlueFactory's poselib relative-pose and
+  homography estimators and its AUC code, at a common long side (`--resize`, default 640), and
+  with `--reference` reports keypoint recall/precision and match Jaccard against a second run.
+  Pairs without ground truth contribute to the agreement report only.
+- Tests build matches from known 3-D points and a known homography (independent of the code under
+  test); a wrong ground-truth rotation drops AUC@5 below 0.1.
+
+### MegaDepth-1500, all 1500 pairs, K = 2048, 1280x960 letterbox, FP32, scored at 640 long side
+
+| Run | AUC@5 | AUC@10 | AUC@20 | mAA | Keypoint recall (min) | Match Jaccard (mean, min) |
+| --- | ----- | ------ | ------ | --- | --------------------- | ------------------------- |
+| PyTorch reference, CPU | 0.5626 | 0.7076 | 0.8162 | 0.6955 | 1 | 1, 1 |
+| TensorRT, TF32 off | 0.5626 | 0.7072 | 0.8157 | 0.6952 | 0.9998 | 0.9999, 0.982 |
+| ORT CPU | 0.5622 | 0.7068 | 0.8158 | 0.6949 | 0.9993 | 0.9988, 0.941 |
+
+- Backend AUCs sit within 0.0005 of the reference. poselib is unseeded, so repeated scoring of the
+  same predictions moves AUC by about that much.
+- These are not comparable to the README gate (0.444/0.610/0.746 at 640 px input, K = 1300): the
+  canvas and K are larger here.
+- Per-pair wall time p50 (both images' extraction, then matching, with preprocessing excluded):
+  reference 236 + 258 ms, ORT 94 + 184 ms, TensorRT 13.1 + 12.3 ms. The TensorRT extraction time
+  is 2 images at 6.5 ms each against 2.7 ms in the bench loop; host-side conversion between
+  pairs and an idle GPU clock are the likely cause and were not investigated.
+- Raw predictions and scores: `reference/uncommitted/c3/full2048/`.

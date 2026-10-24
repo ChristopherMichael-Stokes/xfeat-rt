@@ -9,20 +9,21 @@
 
 ## Export
 
-- [ ] Spike: static XFeat graph matches reference
-- [ ] Spike: padded, fused LighterGlue graph
-- [ ] `xfeat-export` CLI (height, width, K, batch)
+- [x] Spike: static XFeat graph matches reference
+- [x] Spike: padded, fused LighterGlue graph
+- [x] `xfeat-export` CLI (height, width, K, batch)
 
 ## Shared core
 
-- [ ] `xfeat-core` wheel
-- [ ] `xfeat-bench` harness
-- [ ] Contract test: export, load, compare
+- [x] `xfeat-core` wheel
+- [x] `xfeat-bench` harness
+- [x] Contract test: export, load, compare
 
 ## Backends
 
-- [ ] ORT on WSL2 CPU
-- [ ] TensorRT on WSL2 GPU
+- [x] ORT on WSL2 CPU
+- [x] TensorRT on WSL2 GPU (FP32)
+- [ ] TensorRT FP16
 - [ ] Offline throughput mode
 - [ ] Raspberry Pi 5
 - [ ] M2 Mac
@@ -30,8 +31,9 @@
 
 ## Evaluation
 
-- [ ] Custom image-pair loader
-- [ ] MegaDepth-1500 and HPatches scoring
+- [x] Custom image-pair loader
+- [x] MegaDepth-1500 scoring of backend predictions
+- [ ] HPatches scoring
 - [ ] Ablations: precision, resolution, K
 
 ## Targets

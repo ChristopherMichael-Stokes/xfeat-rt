@@ -12,18 +12,23 @@ dependencies = [
   "poselib>=2.0.5",
   "setuptools>=80.10.2",
   "tqdm>=4.70.1",
+  "xfeat-core",
   "xfeat-pairs",
   "xfeat-reference",
 ]
 
 [project.scripts]
 xfeat-megadepth1500 = "xfeat_evaluation.cli:main"
+xfeat-megadepth1500-manifest = "xfeat_evaluation.megadepth_manifest:main"
+xfeat-reference-predict = "xfeat_evaluation.reference_predict:main"
+xfeat-score = "xfeat_evaluation.score:main"
 
 [build-system]
 requires = ["uv_build>=0.13.5,<0.14.0"]
 build-backend = "uv_build"
 
 [tool.uv.sources]
+xfeat-core = { path = "../../../runtime/packages/xfeat-core", editable = true }
 xfeat-pairs = { path = "../../../runtime/packages/xfeat-pairs", editable = true }
 xfeat-reference = { workspace = true }
 gluefactory = { git = "https://github.com/cvg/glue-factory", rev = "2d17e3b3bd7d30f0c828d4c4d3eac4ecefbf283d" }
