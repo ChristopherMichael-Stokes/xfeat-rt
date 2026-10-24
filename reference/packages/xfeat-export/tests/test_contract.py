@@ -1,9 +1,10 @@
-"""Cross-workspace contract: export with `reference`, run with `backends/ort`, compare.
+"""Cross-workspace contract: export with `reference`, run with each backend, compare.
 
-The ORT side runs in its own virtualenv through the `xfeat-ort-predict` CLI, so no torch is
-imported there. Reference is FP32 PyTorch on CPU with the `pixel_centre` grid and pruning off.
+Each backend runs in its own virtualenv through its predict CLI, so no torch is imported there.
+Reference is FP32 PyTorch on CPU with the `pixel_centre` grid and pruning off.
 """
 
+import itertools
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,7 +25,6 @@ from xfeat_reference.pipeline import (
 )
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[4]
-ORT_PROJECT = REPOSITORY_ROOT / "backends" / "ort"
 MEGADEPTH = Path.home() / ".cache/xfeat-rt/gluefactory-data/megadepth1500"
 HEIGHT, WIDTH = 960, 1280
 PAIR_COUNT = 3
@@ -49,11 +49,24 @@ class Case:
     chunking: ChunkedTopK | None
 
 
-CASES = [Case(2048, None), Case(4096, DEFAULT_CHUNKING)]
+CASES = [Case(2048, None), Case(2048, DEFAULT_CHUNKING), Case(4096, DEFAULT_CHUNKING)]
 
 
 @dataclass(frozen=True)
-class OrtPair:
+class Backend:
+    name: str
+    predict_command: str
+
+    @property
+    def project(self) -> Path:
+        return REPOSITORY_ROOT / "backends" / self.name
+
+
+BACKENDS = [Backend("ort", "xfeat-ort-predict"), Backend("tensorrt", "xfeat-trt-predict")]
+
+
+@dataclass(frozen=True)
+class BackendPair:
     keypoints: tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]
     scores: tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]
     descriptors: tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]
@@ -64,10 +77,10 @@ class OrtPair:
 class Outcome:
     reference_features: list[Features]
     reference_matches: list[npt.NDArray[np.int64]]
-    ort: list[OrtPair]
+    backend: list[BackendPair]
 
 
-def _load_ort_pair(path: Path) -> OrtPair:
+def _load_backend_pair(path: Path) -> BackendPair:
     with np.load(path) as archive:
 
         def float_pair(name: str) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
@@ -76,7 +89,7 @@ def _load_ort_pair(path: Path) -> OrtPair:
                 np.asarray(archive[f"{name}1"], dtype=np.float32),
             )
 
-        return OrtPair(
+        return BackendPair(
             float_pair("keypoints"),
             float_pair("scores"),
             float_pair("descriptors"),
@@ -91,11 +104,16 @@ def _gray_image(name: str) -> npt.NDArray[np.float32]:
     return (resized.astype(np.float32).mean(axis=2) / 255.0)[None, None]
 
 
-@pytest.fixture(scope="module", params=CASES, ids=lambda case: f"k{case.top_k}")
+@pytest.fixture(
+    scope="module",
+    params=list(itertools.product(BACKENDS, CASES)),
+    ids=lambda param: f"{param[0].name}-k{param[1].top_k}{'-chunked' if param[1].chunking else ''}",
+)
 def outcome(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory) -> Outcome:
-    case = request.param
+    backend, case = request.param
+    assert isinstance(backend, Backend)
     assert isinstance(case, Case)
-    work = tmp_path_factory.mktemp(f"k{case.top_k}")
+    work = tmp_path_factory.mktemp(f"{backend.name}-k{case.top_k}-{bool(case.chunking)}")
     torch.use_deterministic_algorithms(mode=True)
     config = ReferenceConfig(GridNormalisation.PIXEL_CENTRE, pruning=False, top_k=case.top_k)
     pipeline = ReferencePipeline(config, torch.device("cpu"))
@@ -136,8 +154,8 @@ def outcome(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFac
             "run",
             "--frozen",
             "--project",
-            str(ORT_PROJECT),
-            "xfeat-ort-predict",
+            str(backend.project),
+            backend.predict_command,
             "--xfeat",
             str(xfeat_path),
             "--lighterglue",
@@ -145,12 +163,14 @@ def outcome(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFac
             "--images",
             *map(str, image_paths),
             "--out-dir",
-            str(work / "ort"),
+            str(work / "predictions"),
         ],
         check=True,
     )
-    ort = [_load_ort_pair(work / "ort" / f"pair{i}.npz") for i in range(PAIR_COUNT)]
-    return Outcome(reference_features, reference_matches, ort)
+    predictions = [
+        _load_backend_pair(work / "predictions" / f"pair{i}.npz") for i in range(PAIR_COUNT)
+    ]
+    return Outcome(reference_features, reference_matches, predictions)
 
 
 def _pixel_set(keypoints: npt.NDArray[np.float32]) -> dict[tuple[int, int], int]:
@@ -160,46 +180,47 @@ def _pixel_set(keypoints: npt.NDArray[np.float32]) -> dict[tuple[int, int], int]
 
 def test_keypoints_agree_up_to_tie_swaps(outcome: Outcome) -> None:
     for index, reference in enumerate(outcome.reference_features):
-        ort = outcome.ort[index // 2]
+        backend = outcome.backend[index // 2]
         side = index % 2
         reference_scores = reference.scores.numpy()
-        ort_scores = ort.scores[side]
+        backend_scores = backend.scores[side]
         reference_rows = _pixel_set(reference.keypoints.numpy())
-        ort_rows = _pixel_set(ort.keypoints[side])
-        assert len(reference_rows) == len(ort_rows) == len(reference_scores) > 0
-        only_reference = reference_rows.keys() - ort_rows.keys()
-        only_ort = ort_rows.keys() - reference_rows.keys()
+        backend_rows = _pixel_set(backend.keypoints[side])
+        assert len(reference_rows) == len(backend_rows) == len(reference_scores) > 0
+        only_reference = reference_rows.keys() - backend_rows.keys()
+        only_backend = backend_rows.keys() - reference_rows.keys()
         assert len(only_reference) <= MAX_TIE_SWAPS
-        assert len(only_ort) <= MAX_TIE_SWAPS
-        kth_score = min(reference_scores.min(), ort_scores.min())
+        assert len(only_backend) <= MAX_TIE_SWAPS
+        kth_score = min(reference_scores.min(), backend_scores.min())
         for point in only_reference:
             assert (
                 abs(reference_scores[reference_rows[point]] - kth_score)
                 <= TIE_RELATIVE_SCORE_GAP * kth_score
             )
-        for point in only_ort:
+        for point in only_backend:
             assert (
-                abs(ort_scores[ort_rows[point]] - kth_score) <= TIE_RELATIVE_SCORE_GAP * kth_score
+                abs(backend_scores[backend_rows[point]] - kth_score)
+                <= TIE_RELATIVE_SCORE_GAP * kth_score
             )
 
 
 def test_scores_and_descriptors_agree_on_common_keypoints(outcome: Outcome) -> None:
     for index, reference in enumerate(outcome.reference_features):
-        ort = outcome.ort[index // 2]
+        backend = outcome.backend[index // 2]
         side = index % 2
         reference_rows = _pixel_set(reference.keypoints.numpy())
-        ort_rows = _pixel_set(ort.keypoints[side])
-        common = sorted(reference_rows.keys() & ort_rows.keys())
+        backend_rows = _pixel_set(backend.keypoints[side])
+        common = sorted(reference_rows.keys() & backend_rows.keys())
         reference_index = [reference_rows[p] for p in common]
-        ort_index = [ort_rows[p] for p in common]
+        backend_index = [backend_rows[p] for p in common]
         score_difference = np.abs(
-            reference.scores.numpy()[reference_index] - ort.scores[side][ort_index]
+            reference.scores.numpy()[reference_index] - backend.scores[side][backend_index]
         )
         assert score_difference.max() <= MAX_SCORE_ABSOLUTE_DIFFERENCE
         cosine = np.einsum(
             "kd,kd->k",
             reference.descriptors.numpy()[reference_index],
-            ort.descriptors[side][ort_index],
+            backend.descriptors[side][backend_index],
         )
         assert cosine.min() >= MIN_DESCRIPTOR_COSINE
 
@@ -207,7 +228,7 @@ def test_scores_and_descriptors_agree_on_common_keypoints(outcome: Outcome) -> N
 def test_matches_agree_by_keypoint_coordinates(outcome: Outcome) -> None:
     for index, matches in enumerate(outcome.reference_matches):
         first, second = outcome.reference_features[2 * index : 2 * index + 2]
-        ort = outcome.ort[index]
+        backend = outcome.backend[index]
         reference_pairs = {
             (
                 tuple(np.rint(first.keypoints[a].numpy()).astype(int)),
@@ -215,13 +236,13 @@ def test_matches_agree_by_keypoint_coordinates(outcome: Outcome) -> None:
             )
             for a, b in matches
         }
-        ort_pairs = {
+        backend_pairs = {
             (
-                tuple(np.rint(ort.keypoints[0][a]).astype(int)),
-                tuple(np.rint(ort.keypoints[1][b]).astype(int)),
+                tuple(np.rint(backend.keypoints[0][a]).astype(int)),
+                tuple(np.rint(backend.keypoints[1][b]).astype(int)),
             )
-            for a, b in ort.matches
+            for a, b in backend.matches
         }
         assert len(reference_pairs) > MIN_MATCHES
-        jaccard = len(reference_pairs & ort_pairs) / len(reference_pairs | ort_pairs)
+        jaccard = len(reference_pairs & backend_pairs) / len(reference_pairs | backend_pairs)
         assert jaccard >= MIN_MATCH_JACCARD

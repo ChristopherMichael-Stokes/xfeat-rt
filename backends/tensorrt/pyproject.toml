@@ -1,0 +1,45 @@
+[project]
+name = "xfeat-trt"
+version = "0.1.0"
+description = "XFeat and LighterGlue inference on TensorRT."
+requires-python = ">=3.13"
+dependencies = [
+  "cuda-python>=13.4.4",
+  "numpy>=2.5.4",
+  "onnx>=1.23.2",
+  "tensorrt-cu13>=11.4.0.106",
+  "tensorrt-cu13-libs>=11.4.0.106",
+  "xfeat-bench",
+  "xfeat-core",
+]
+
+[project.scripts]
+xfeat-trt-bench = "xfeat_trt.bench:main"
+xfeat-trt-predict = "xfeat_trt.predict:main"
+
+[dependency-groups]
+dev = ["pytest>=9.1.1", "ty>=0.0.91"]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.ty.environment]
+python-version = "3.13"
+extra-paths = ["stubs"]
+
+[tool.ty.rules]
+all = "error"
+
+[tool.ty.analysis]
+respect-type-ignore-comments = false
+
+[tool.uv.sources]
+tensorrt-cu13-libs = { index = "nvidia" }
+xfeat-bench = { path = "../../runtime/packages/xfeat-bench", editable = true }
+xfeat-core = { path = "../../runtime/packages/xfeat-core", editable = true }
+
+[[tool.uv.index]]
+name = "nvidia"
+url = "https://pypi.nvidia.com/"
+explicit = true

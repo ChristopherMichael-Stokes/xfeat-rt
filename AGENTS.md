@@ -57,6 +57,7 @@ Run from the repo root unless a workspace is named.
 | Reference tests (incl. contract test) | `uv run --frozen pytest packages` from `reference/` |
 | Export models                | `make export TOP_K=2048` (writes `reference/uncommitted/models/`) |
 | CPU latency                  | `uv run --frozen xfeat-ort-bench --help` from `backends/ort/` |
+| CUDA latency                 | `uv run --frozen xfeat-trt-bench --help` from `backends/tensorrt/` (export with `--chunked-topk`; plain TopK costs ~5 ms on TensorRT) |
 | MegaDepth-1500 AUC           | `uv run --frozen xfeat-megadepth1500 --grid pixel_centre --no-pruning --output-dir uncommitted/megadepth1500/<run>` from `reference/` (`--help` for device, K, resize) |
 
 ## Checks

@@ -1,0 +1,23 @@
+[[repos]]
+repo = "https://github.com/astral-sh/uv-pre-commit"
+rev = "0.13.5"
+
+[[repos.hooks]]
+id = "uv-lock"
+files = '(^|/)pyproject\.toml$|^uv\.lock$'
+
+[[repos.hooks]]
+id = "uv-audit"
+files = '(^|/)pyproject\.toml$|^uv\.lock$'
+args = ["--preview-features", "audit-command"]
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "ty"
+name = "ty"
+entry = "uv run --frozen ty check"
+language = "system"
+pass_filenames = false
+always_run = true
