@@ -11,6 +11,7 @@ dependencies = [
   "tensorrt-cu13-libs>=11.4.0.106",
   "xfeat-bench",
   "xfeat-core",
+  "xfeat-pairs",
 ]
 
 [project.scripts]
@@ -38,6 +39,7 @@ respect-type-ignore-comments = false
 tensorrt-cu13-libs = { index = "nvidia" }
 xfeat-bench = { path = "../../runtime/packages/xfeat-bench", editable = true }
 xfeat-core = { path = "../../runtime/packages/xfeat-core", editable = true }
+xfeat-pairs = { path = "../../runtime/packages/xfeat-pairs", editable = true }
 
 [[tool.uv.index]]
 name = "nvidia"

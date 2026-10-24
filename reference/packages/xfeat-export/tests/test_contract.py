@@ -5,6 +5,7 @@ Reference is FP32 PyTorch on CPU with the `pixel_centre` grid and pruning off.
 """
 
 import itertools
+import json
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +18,7 @@ import torch
 
 from xfeat_export.cli import export_lighterglue, export_xfeat
 from xfeat_export.xfeat_graph import DEFAULT_CHUNKING, ChunkedTopK
+from xfeat_pairs.predictions import read_index, read_pair
 from xfeat_reference.pipeline import (
     Features,
     GridNormalisation,
@@ -80,21 +82,35 @@ class Outcome:
     backend: list[BackendPair]
 
 
-def _load_backend_pair(path: Path) -> BackendPair:
-    with np.load(path) as archive:
+def _load_backend_pairs(directory: Path) -> list[BackendPair]:
+    """Predictions with keypoints mapped from original pixels back to the model input.
 
-        def float_pair(name: str) -> tuple[npt.NDArray[np.float32], npt.NDArray[np.float32]]:
-            return (
-                np.asarray(archive[f"{name}0"], dtype=np.float32),
-                np.asarray(archive[f"{name}1"], dtype=np.float32),
+    Inverse of the stretch resize, written from its definition: pixel centres at integers, so
+    `x_model = (x_original + 1/2) W_model / W_original - 1/2`.
+    """
+    index = read_index(directory)
+    pairs = []
+    for entry in index.pairs:
+        prediction = read_pair(directory, entry)
+
+        def to_model(
+            keypoints: npt.NDArray[np.float32], original_size: tuple[int, int]
+        ) -> npt.NDArray[np.float32]:
+            ratio = np.asarray(index.model_size) / np.asarray(original_size)
+            return ((keypoints + 0.5) * ratio - 0.5).astype(np.float32)
+
+        pairs.append(
+            BackendPair(
+                (
+                    to_model(prediction.keypoints0, prediction.original_size0),
+                    to_model(prediction.keypoints1, prediction.original_size1),
+                ),
+                (prediction.scores0, prediction.scores1),
+                (prediction.descriptors0, prediction.descriptors1),
+                prediction.matches,
             )
-
-        return BackendPair(
-            float_pair("keypoints"),
-            float_pair("scores"),
-            float_pair("descriptors"),
-            np.asarray(archive["matches"], dtype=np.int64),
         )
+    return pairs
 
 
 def _gray_image(name: str) -> npt.NDArray[np.float32]:
@@ -134,20 +150,27 @@ def outcome(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFac
         line.split()[:2]
         for line in (MEGADEPTH / "pairs_calibrated.txt").read_text().splitlines()[:PAIR_COUNT]
     ]
-    image_paths: list[Path] = []
     reference_features: list[Features] = []
     reference_matches: list[npt.NDArray[np.int64]] = []
-    for index, pair in enumerate(names):
-        pair_features = []
-        for view, name in enumerate(pair):
-            image = _gray_image(name)
-            path = work / f"pair{index}_{view}.npy"
-            np.save(path, image)
-            image_paths.append(path)
-            pair_features.append(pipeline.extract(torch.from_numpy(image)))
+    for pair in names:
+        pair_features = [pipeline.extract(torch.from_numpy(_gray_image(name))) for name in pair]
         reference_features += pair_features
         reference_matches.append(pipeline.match(*pair_features))
 
+    manifest = work / "pairs.jsonl"
+    manifest.write_text(
+        "".join(
+            json.dumps(
+                {
+                    "name": f"pair{index}",
+                    "image0": str(MEGADEPTH / "images" / pair[0]),
+                    "image1": str(MEGADEPTH / "images" / pair[1]),
+                }
+            )
+            + "\n"
+            for index, pair in enumerate(names)
+        )
+    )
     subprocess.run(  # noqa: S603  # fixed argv, no shell
         [  # noqa: S607
             "uv",
@@ -160,17 +183,16 @@ def outcome(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFac
             str(xfeat_path),
             "--lighterglue",
             str(lighterglue_path),
-            "--images",
-            *map(str, image_paths),
+            "--manifest",
+            str(manifest),
+            "--resize",
+            "stretch",
             "--out-dir",
             str(work / "predictions"),
         ],
         check=True,
     )
-    predictions = [
-        _load_backend_pair(work / "predictions" / f"pair{i}.npz") for i in range(PAIR_COUNT)
-    ]
-    return Outcome(reference_features, reference_matches, predictions)
+    return Outcome(reference_features, reference_matches, _load_backend_pairs(work / "predictions"))
 
 
 def _pixel_set(keypoints: npt.NDArray[np.float32]) -> dict[tuple[int, int], int]:

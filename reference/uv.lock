@@ -1923,6 +1923,21 @@ wheels = [
 ]
 
 [[package]]
+name = "xfeat-core"
+version = "0.1.0"
+source = { editable = "../runtime/packages/xfeat-core" }
+dependencies = [
+    { name = "numpy" },
+    { name = "pydantic" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=2.5.4" },
+    { name = "pydantic", specifier = ">=2.13.0" },
+]
+
+[[package]]
 name = "xfeat-evaluation"
 version = "0.1.0"
 source = { editable = "packages/xfeat-evaluation" }
@@ -1935,6 +1950,7 @@ dependencies = [
     { name = "poselib" },
     { name = "setuptools" },
     { name = "tqdm" },
+    { name = "xfeat-pairs" },
     { name = "xfeat-reference" },
 ]
 
@@ -1948,6 +1964,7 @@ requires-dist = [
     { name = "poselib", specifier = ">=2.0.5" },
     { name = "setuptools", specifier = ">=80.10.2" },
     { name = "tqdm", specifier = ">=4.70.1" },
+    { name = "xfeat-pairs", editable = "../runtime/packages/xfeat-pairs" },
     { name = "xfeat-reference", editable = "packages/xfeat-reference" },
 ]
 
@@ -1979,6 +1996,25 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 test = [{ name = "opencv-python-headless", specifier = ">=5.0.0.93" }]
+
+[[package]]
+name = "xfeat-pairs"
+version = "0.1.0"
+source = { editable = "../runtime/packages/xfeat-pairs" }
+dependencies = [
+    { name = "numpy" },
+    { name = "opencv-python-headless" },
+    { name = "pydantic" },
+    { name = "xfeat-core" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "numpy", specifier = ">=2.5.4" },
+    { name = "opencv-python-headless", specifier = ">=5.0.0.93" },
+    { name = "pydantic", specifier = ">=2.13.0" },
+    { name = "xfeat-core", editable = "../runtime/packages/xfeat-core" },
+]
 
 [[package]]
 name = "xfeat-reference"

@@ -8,6 +8,7 @@ dependencies = [
   "onnxruntime>=1.31.0",
   "xfeat-bench",
   "xfeat-core",
+  "xfeat-pairs",
 ]
 
 [project.scripts]
@@ -33,3 +34,4 @@ respect-type-ignore-comments = false
 [tool.uv.sources]
 xfeat-bench = { path = "../../runtime/packages/xfeat-bench", editable = true }
 xfeat-core = { path = "../../runtime/packages/xfeat-core", editable = true }
+xfeat-pairs = { path = "../../runtime/packages/xfeat-pairs", editable = true }

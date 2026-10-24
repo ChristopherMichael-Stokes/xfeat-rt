@@ -79,3 +79,21 @@ are in `backends/tensorrt/uncommitted/bench/`.
 - `trtexec` cross-check of the headline numbers.
 - `make export` has no chunked option; the chunked models were exported with
   `xfeat-export --chunked-topk --out-dir uncommitted/models-chunked`.
+
+## 3b: `xfeat-pairs`, manifest and prediction directory
+
+- `runtime/packages/xfeat-pairs`: JSON Lines pair manifest with optional `relative_pose` or
+  `homography` ground truth; `stretch` and `letterbox` preprocessing (8-bit RGB resize, then channel
+  mean, as the reference); prediction directory (`index.json` written last, `pairs/NNNNNN.npz`,
+  keypoints in original-image pixel coordinates, per-pair extract and match wall time, both models'
+  `metadata_props`, backend and settings); `predict_pairs` loop shared by the backends.
+- `xfeat-ort-predict` and `xfeat-trt-predict` take `--manifest --resize --out-dir` and write that
+  directory. The `.npy`/`pair{i}.npz` interface is gone, and `rescale_keypoints` left `xfeat-core`
+  (the preprocessing mapping replaces it and handles letterbox).
+- The contract test builds a manifest from MegaDepth-1500, runs the backend CLI and reads the
+  directory with `xfeat-pairs`, mapping keypoints back to model pixels by its own derivation.
+  18 cases pass.
+- Resizing the gray image instead of the RGB image changed pixels by up to 1/255 and the keypoint
+  set by up to 156 per image (near-tied candidates); the loader resizes RGB first.
+- `xfeat-evaluation` depends on `xfeat-pairs` by path; `reference/uv.lock` resolves it under the
+  `numpy<2.4` override.

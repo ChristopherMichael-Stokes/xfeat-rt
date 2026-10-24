@@ -39,7 +39,8 @@ class XFeatModel:
         device = Device(device_index)
         device.set_current()
         loaded = load_or_build_engine(path, device, cache_dir, options)
-        metadata = parse_metadata(loaded.metadata)
+        self.raw_metadata = loaded.metadata
+        metadata = parse_metadata(self.raw_metadata)
         if not isinstance(metadata, XFeatMetadata):
             msg = f"{path} is a {metadata.model} graph, not xfeat"
             raise TypeError(msg)
@@ -80,7 +81,8 @@ class LighterGlueModel:
         device = Device(device_index)
         device.set_current()
         loaded = load_or_build_engine(path, device, cache_dir, options)
-        metadata = parse_metadata(loaded.metadata)
+        self.raw_metadata = loaded.metadata
+        metadata = parse_metadata(self.raw_metadata)
         if not isinstance(metadata, LighterGlueMetadata):
             msg = f"{path} is a {metadata.model} graph, not lighterglue"
             raise TypeError(msg)

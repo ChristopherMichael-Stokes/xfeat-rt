@@ -33,7 +33,8 @@ class XFeatModel:
     def __init__(self, path: Path, intra_op_threads: int = 0) -> None:
         """Load `path`; `intra_op_threads` 0 lets ORT choose."""
         self._session = _session(path, intra_op_threads)
-        metadata = parse_metadata(self._session.get_modelmeta().custom_metadata_map)
+        self.raw_metadata = dict(self._session.get_modelmeta().custom_metadata_map)
+        metadata = parse_metadata(self.raw_metadata)
         if not isinstance(metadata, XFeatMetadata):
             msg = f"{path} is a {metadata.model} graph, not xfeat"
             raise TypeError(msg)
@@ -64,7 +65,8 @@ class LighterGlueModel:
     def __init__(self, path: Path, intra_op_threads: int = 0) -> None:
         """Load `path`; `intra_op_threads` 0 lets ORT choose."""
         self._session = _session(path, intra_op_threads)
-        metadata = parse_metadata(self._session.get_modelmeta().custom_metadata_map)
+        self.raw_metadata = dict(self._session.get_modelmeta().custom_metadata_map)
+        metadata = parse_metadata(self.raw_metadata)
         if not isinstance(metadata, LighterGlueMetadata):
             msg = f"{path} is a {metadata.model} graph, not lighterglue"
             raise TypeError(msg)

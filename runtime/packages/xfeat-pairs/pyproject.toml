@@ -1,0 +1,18 @@
+[project]
+name = "xfeat-pairs"
+version = "0.1.0"
+description = "Image-pair manifests, preprocessing and the prediction-directory format shared by backends and evaluation."
+requires-python = ">=3.13"
+dependencies = [
+  "numpy>=2.5.4",
+  "opencv-python-headless>=5.0.0.93",
+  "pydantic>=2.13.0",
+  "xfeat-core",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+xfeat-core = { workspace = true }

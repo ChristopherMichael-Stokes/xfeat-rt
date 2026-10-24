@@ -9,7 +9,7 @@ backends and the pipeline run the exported models without PyTorch.
 | Path         | uv workspace | Holds                                                     |
 | ------------ | ------------ | --------------------------------------------------------- |
 | `reference/` | yes          | PyTorch reference implementation and model export         |
-| `runtime/`   | yes          | `xfeat-core` (metadata, result types, glue) and `xfeat-bench` (timing harness); no PyTorch |
+| `runtime/`   | yes          | `xfeat-core` (metadata, result types, glue), `xfeat-pairs` (pair manifest, preprocessing, prediction directory) and `xfeat-bench` (timing harness); no PyTorch |
 | `backends/<name>/` | no, one uv project each | One inference backend per directory; own lock, `.venv` and Python pin; never installed together |
 | `agent-docs/` | no          | Docs written by and for agents: briefs, plans, research reports |
 | root         | no           | Shared checks (`prek.toml`), `ruff.toml`, `Makefile`      |
@@ -17,8 +17,11 @@ backends and the pipeline run the exported models without PyTorch.
 - Each workspace has its own `uv.lock` and `.venv`. Members live at
   `<workspace>/packages/<dist-name>/src/<module>/` and are picked up by the `packages/*` glob.
 - Backends consume `runtime/` packages by path in development and as built wheels elsewhere.
-- The workspaces meet only through exported model files. Test that contract by exporting with
-  `reference` and loading with a backend.
+- The workspaces meet through exported model files and prediction directories. Test that contract
+  by exporting with `reference`, loading with a backend and reading the backend's predictions back.
+  `xfeat-evaluation` consumes `runtime/packages/xfeat-pairs` by path (pure Python, no torch) to read
+  predictions and manifests; `reference/` pins `numpy<2.4` for GlueFactory, which overrides the
+  runtime packages' own numpy floor there.
 
 ## Agent docs
 

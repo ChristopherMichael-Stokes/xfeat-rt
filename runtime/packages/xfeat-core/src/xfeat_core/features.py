@@ -81,11 +81,3 @@ def match_pairs(matches0: npt.NDArray[np.int64]) -> npt.NDArray[np.int64]:
     """
     matched = np.flatnonzero(matches0 >= 0)
     return np.stack([matched, matches0[matched]], axis=1).astype(np.int64)
-
-
-def rescale_keypoints(
-    keypoints: npt.NDArray[np.float32], from_size: tuple[int, int], to_size: tuple[int, int]
-) -> npt.NDArray[np.float32]:
-    """Map pixel-centre keypoints between image sizes: `x' = (x + 1/2) s - 1/2`, `s = W' / W`."""
-    scale = np.asarray(to_size, dtype=np.float32) / np.asarray(from_size, dtype=np.float32)
-    return ((keypoints + 0.5) * scale - 0.5).astype(np.float32)

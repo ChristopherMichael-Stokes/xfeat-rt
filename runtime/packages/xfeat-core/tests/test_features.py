@@ -7,7 +7,6 @@ from xfeat_core.features import (
     compact_features,
     match_pairs,
     pad_features,
-    rescale_keypoints,
 )
 from xfeat_core.metadata import LighterGlueMetadata, XFeatMetadata, parse_metadata
 
@@ -104,11 +103,3 @@ def test_match_pairs_lists_matched_indices_only() -> None:
 
 def test_match_pairs_of_no_matches_has_shape_zero_by_two() -> None:
     assert match_pairs(np.full(4, -1, dtype=np.int64)).shape == (0, 2)
-
-
-def test_rescale_maps_pixel_centres_not_pixel_indices() -> None:
-    # pixel 0 of a 4 px row spans [0, 4); its centre 0.5 doubles to 1.0 in an 8 px row, index 0.5
-    rescaled = rescale_keypoints(
-        np.array([[0.0, 0.0], [3.0, 3.0]], dtype=np.float32), (4, 4), (8, 8)
-    )
-    np.testing.assert_allclose(rescaled, [[0.5, 0.5], [6.5, 6.5]])
