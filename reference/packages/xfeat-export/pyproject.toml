@@ -1,0 +1,25 @@
+[project]
+name = "xfeat-export"
+version = "0.1.0"
+description = "Static-shape rewrite of XFeat and LighterGlue and their ONNX export."
+requires-python = ">=3.13"
+dependencies = [
+  "kornia==0.8.3",
+  "onnx>=1.23.2",
+  "onnxscript>=0.7.2",
+  "torch>=2.14.1",
+  "xfeat-reference",
+]
+
+[project.scripts]
+xfeat-export = "xfeat_export.cli:main"
+
+[dependency-groups]
+test = ["opencv-python-headless>=5.0.0.93"]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+xfeat-reference = { workspace = true }

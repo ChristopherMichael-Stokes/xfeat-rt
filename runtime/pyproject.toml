@@ -1,5 +1,8 @@
 [dependency-groups]
-dev = ["ty>=0.0.91"]
+dev = [
+  "pytest>=9.1.1",
+  "ty>=0.0.91",
+]
 
 [tool.ty.environment]
 python-version = "3.13"

@@ -1,0 +1,35 @@
+[project]
+name = "xfeat-ort"
+version = "0.1.0"
+description = "XFeat and LighterGlue inference on ONNX Runtime."
+requires-python = ">=3.13"
+dependencies = [
+  "numpy>=2.5.4",
+  "onnxruntime>=1.31.0",
+  "xfeat-bench",
+  "xfeat-core",
+]
+
+[project.scripts]
+xfeat-ort-bench = "xfeat_ort.bench:main"
+xfeat-ort-predict = "xfeat_ort.predict:main"
+
+[dependency-groups]
+dev = ["ty>=0.0.91"]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.ty.environment]
+python-version = "3.13"
+
+[tool.ty.rules]
+all = "error"
+
+[tool.ty.analysis]
+respect-type-ignore-comments = false
+
+[tool.uv.sources]
+xfeat-bench = { path = "../../runtime/packages/xfeat-bench", editable = true }
+xfeat-core = { path = "../../runtime/packages/xfeat-core", editable = true }

@@ -9,7 +9,7 @@ backends and the pipeline run the exported models without PyTorch.
 | Path         | uv workspace | Holds                                                     |
 | ------------ | ------------ | --------------------------------------------------------- |
 | `reference/` | yes          | PyTorch reference implementation and model export         |
-| `runtime/`   | yes          | Shared core wheel (metadata, glue, benchmark harness); no PyTorch |
+| `runtime/`   | yes          | `xfeat-core` (metadata, result types, glue) and `xfeat-bench` (timing harness); no PyTorch |
 | `backends/<name>/` | no, one uv project each | One inference backend per directory; own lock, `.venv` and Python pin; never installed together |
 | `agent-docs/` | no          | Docs written by and for agents: briefs, plans, research reports |
 | root         | no           | Shared checks (`prek.toml`), `ruff.toml`, `Makefile`      |
@@ -53,7 +53,10 @@ Run from the repo root unless a workspace is named.
 | Update hook revisions        | `make update-hooks` (skips releases under 7 days old)  |
 | Types in one workspace       | `uv run --frozen ty check` from `reference/` or `runtime/` |
 | Add a dependency to a member | `uv add --package <dist-name> <dep>` from the workspace |
-| Reference tests              | `uv run --frozen pytest packages` from `reference/`    |
+| All tests                    | `make test`                                            |
+| Reference tests (incl. contract test) | `uv run --frozen pytest packages` from `reference/` |
+| Export models                | `make export TOP_K=2048` (writes `reference/uncommitted/models/`) |
+| CPU latency                  | `uv run --frozen xfeat-ort-bench --help` from `backends/ort/` |
 | MegaDepth-1500 AUC           | `uv run --frozen xfeat-megadepth1500 --grid pixel_centre --no-pruning --output-dir uncommitted/megadepth1500/<run>` from `reference/` (`--help` for device, K, resize) |
 
 ## Checks

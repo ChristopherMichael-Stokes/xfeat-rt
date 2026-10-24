@@ -1,0 +1,13 @@
+[project]
+name = "xfeat-core"
+version = "0.1.0"
+description = "Model metadata, result types and NumPy glue shared by all inference backends."
+requires-python = ">=3.13"
+dependencies = [
+  "numpy>=2.5.4",
+  "pydantic>=2.13.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.13.5,<0.14.0"]
+build-backend = "uv_build"

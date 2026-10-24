@@ -83,6 +83,16 @@ class ReferencePipeline:
         self._upstream = load_upstream()
         self._xfeat = _build_xfeat(self._upstream, config, device)
 
+    @property
+    def xfeat_network(self) -> Any:  # noqa: ANN401  # upstream XFeatModel is untyped
+        """The upstream XFeat backbone with the pinned weights loaded."""
+        return self._xfeat.net
+
+    @property
+    def lighterglue_network(self) -> Any:  # noqa: ANN401  # kornia LightGlue
+        """The kornia LightGlue network with the pinned weights loaded."""
+        return self._xfeat.lighterglue.net
+
     def extract(self, image: torch.Tensor) -> Features:
         """Detect and describe keypoints in one image.
 
