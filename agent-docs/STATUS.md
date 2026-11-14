@@ -23,6 +23,8 @@ As of 2026-11-14. Plan and stage order: `implementation-plan.md`.
 
 - `trtexec` and `onnxruntime_perf_test` cross-checks of headline latencies.
 - Bootstrap confidence intervals on AUC differences.
+- README rows still measured on the matcher export before the fused cross-attention change: ORT
+  and TensorRT FP32 accuracy, batch throughput at K = 2048. The README marks them.
 - Behaviour without a system CUDA toolkit; timings rerun on idle native Linux (WSL2 numbers are
   dev-only).
 
