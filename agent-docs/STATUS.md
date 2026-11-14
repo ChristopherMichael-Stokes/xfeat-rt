@@ -16,8 +16,8 @@ As of 2026-11-14. Plan and stage order: `implementation-plan.md`.
 
 ## In progress
 
-- Separate export targets per backend: `make export` writes the chunked TopK graph TensorRT needs;
-  ORT on that graph is unmeasured.
+- Separate export targets per backend: `make export` writes the FP16 chunked TopK graph TensorRT
+  runs; ORT on that graph is unmeasured.
 
 ## Open
 
