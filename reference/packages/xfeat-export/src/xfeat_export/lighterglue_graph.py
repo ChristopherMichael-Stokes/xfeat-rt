@@ -1,8 +1,11 @@
 """LighterGlue as a static graph over inputs padded to K keypoints, with validity masks.
 
-Mirrors the CPU path of kornia 0.8.3 `kornia/feature/lightglue.py` (SelfBlock, CrossBlock einsum
-branch, MatchAssignment, `filter_matches`) with pruning and early exit off. Attention is explicit
-MatMul/Softmax with an additive key mask (scaled dot-product attention, Vaswani et al. 2017).
+Mirrors kornia 0.8.3 `kornia/feature/lightglue.py` (SelfBlock, CrossBlock, MatchAssignment,
+`filter_matches`) with pruning and early exit off. Attention is explicit MatMul/Softmax with an
+additive key mask (scaled dot-product attention, Vaswani et al. 2017). Cross-attention follows
+CrossBlock's flash branch, one standard attention per direction: TensorRT fuses
+MatMul/Softmax/MatMul into one attention kernel, and the einsum branch's shared similarity with a
+transposed second softmax does not match that pattern.
 The dustbin row and column are not built because `filter_matches` never reads them.
 """
 
@@ -90,14 +93,12 @@ class StaticLighterGlue(nn.Module):
         bias0: torch.Tensor,
         bias1: torch.Tensor,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        scale = block.scale**0.5
-        qk0 = _split_heads(block.to_qk(x0), block.heads) * scale
-        qk1 = _split_heads(block.to_qk(x1), block.heads) * scale
+        qk0 = _split_heads(block.to_qk(x0), block.heads)
+        qk1 = _split_heads(block.to_qk(x1), block.heads)
         value0 = _split_heads(block.to_v(x0), block.heads)
         value1 = _split_heads(block.to_v(x1), block.heads)
-        similarity = torch.matmul(qk0, qk1.transpose(-1, -2))
-        message0 = torch.matmul((similarity + bias1).softmax(-1), value1)
-        message1 = torch.matmul((similarity.transpose(-1, -2) + bias0).softmax(-1), value0)
+        message0 = masked_attention(qk0, qk1, value1, bias1)
+        message1 = masked_attention(qk1, qk0, value0, bias0)
         message0, message1 = (
             block.to_out(m.transpose(1, 2).flatten(start_dim=-2)) for m in (message0, message1)
         )

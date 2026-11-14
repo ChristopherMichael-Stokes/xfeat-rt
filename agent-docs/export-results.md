@@ -62,7 +62,8 @@ GridSample), read from source.
 LighterGlue: inputs `kpts{0,1}[1,K,2]` f32, `desc{0,1}[1,K,64]` f32, `valid{0,1}[1,K]` bool,
 `image_size{0,1}[1,2]` f32 (w, h). Outputs `m0[1,K]` int64 (-1 = unmatched), `mscores0[1,K]` f32.
 The kornia 0.8.3 CPU path is rewritten module by module on the loaded kornia weights: self-attention,
-cross-attention with one shared similarity and two softmaxes, final assignment and mutual-NN filter.
+cross-attention as one standard attention per direction (shared similarity until the fused
+cross-attention stage, `low-precision-results.md`), final assignment and mutual-NN filter.
 Attention is explicit `MatMul`/`Softmax` with an additive key mask of -30000, which stays finite in
 FP16 (no NaN rows) and underflows to exactly 0 after `exp`. Log-assignment and the max/argmax run
 masked, and dustbins are not built (`filter_matches` never reads them). Pruning and early exit are
