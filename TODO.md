@@ -24,7 +24,7 @@
 - [x] ORT on WSL2 CPU
 - [x] TensorRT on WSL2 GPU (FP32)
 - [x] TensorRT FP16
-- [ ] Offline throughput mode
+- [x] Offline throughput mode
 - [ ] Raspberry Pi 5
 - [ ] M2 Mac
 - [ ] Jetson Orin NX
