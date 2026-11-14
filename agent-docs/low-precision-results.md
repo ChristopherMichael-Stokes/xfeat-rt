@@ -17,12 +17,8 @@ native Linux.
 | INT8 and FP8 on the matcher's linear layers | Done: not yet shown to help; stopped |
 | Calibration and accuracy, accuracy recovery | Not run: no probe was taken forward |
 
-Session scratch (cleared by a reboot):
-`/tmp/claude-1000/-home-chris-xfeat-dev-xfeat-rt/3c74d365-5871-4776-9b71-4e85d332030d/scratchpad/`
-holds `layer-profile/profile_layers.py` (per-layer timing harness), `models-fused/` (FP16 graphs
-with the fused cross-attention, regenerable with `xfeat-export`), `auc/` (manifest, predictions,
-scores, `run_auc.sh`), `qdq-probe/` (FP8 and INT8 probe scripts, graphs and bench output) and
-`batch-fp8/` (K = 4096 ladders and `bench_pairs.py` output).
+The timing harnesses, probe graphs, predictions and bench output lived in session scratch and
+were deleted on 2026-11-14; the tables here are what remains.
 
 ## Per-layer timing of the FP16 matcher before the change
 
@@ -83,8 +79,8 @@ side; agreement is against the shared-similarity run with the same K:
 
 ## Timing probes
 
-Eight probe graphs with throwaway scales, timing only, no calibration and no accuracy measured
-(session scratch, `qdq-probe/models/`). Opset 20 unchanged; scales are float16 scalars; FP8 is
+Eight probe graphs with throwaway scales, timing only, no calibration and no accuracy measured.
+Opset 20 unchanged; scales are float16 scalars; FP8 is
 expressed by a `FLOAT8E4M3FN` zero-point tensor of 0.
 
 | Probe | Quantize/dequantize placement | Engine inspector |
