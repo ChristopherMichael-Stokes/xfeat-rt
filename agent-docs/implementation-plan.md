@@ -204,6 +204,6 @@ prediction-file format are the hooks it will build on.
 | ORT CoreML EP share of each graph on ANE/GPU                            | M2 Mac run with EP profiling                                         |
 | Pi 5: ORT vs OpenVINO                                                   | Latency on Pi 5 16 GB with throttle state logged                        |
 | Orin NX support on the latest JetPack at that time; container Python version and TensorRT bindings | Container smoke test on the Orin NX with the latest JetPack                       |
-| FP16 and INT8 accuracy (robofans: XFeat FP16 -2 AUC@5, no speedup)      | FP16 measured on TensorRT (AUC within 0.0024 of FP32, LighterGlue 2.7x faster at K = 4096); INT8 and confidence intervals in the ablations stage |
+| FP16 and INT8 accuracy (robofans: XFeat FP16 -2 AUC@5, no speedup)      | FP16 measured on TensorRT (AUC within 0.0024 of FP32, LighterGlue 2.7x faster at K = 4096); INT8 and FP8 timing probes gave no gain worth calibrating on the 4070 Ti (`low-precision-results.md`); confidence intervals in the ablations stage |
 | Largest K per device inside the latency budget; LighterGlue attention cost at K = 2048 and 4096 (about 4x per doubling on CPU) | K sweep on each device, XFeat and LighterGlue timed separately |
 | Chunked TopK on TensorRT at K = 4096: builds, matches the reference, cost | Settled: chunked K = 4096 builds and passes the contract test (`tensorrt-backend-results.md`)                     |

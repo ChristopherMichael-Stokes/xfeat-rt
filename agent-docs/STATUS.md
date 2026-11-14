@@ -12,6 +12,7 @@ As of 2026-11-14. Plan and stage order: `implementation-plan.md`.
 | TensorRT backend | FP32 and FP16 engines, engine cache, CUDA latency tables; FP16 within 0.0024 AUC of FP32 | `tensorrt-backend-results.md` |
 | Pair loader and scoring | `xfeat-pairs` manifest and prediction directory; `xfeat-score` on MegaDepth-1500 and own pairs | `tensorrt-backend-results.md` |
 | Batch processing (TensorRT) | Batch ladder export, per-machine calibration, `xfeat-trt-predict-batch`: 2.9x pairs per second over the real-time path, no AUC drop | `batch-mode-plan.md`, `batch-throughput-results.md` |
+| Precision below FP16 (TensorRT) | Fused cross-attention export: matcher 25 % faster at K = 4096, AUC within 0.003. INT8 and FP8 timing probes: no gain worth calibrating on the 4070 Ti; closed | `low-precision-plan.md`, `low-precision-results.md` |
 
 ## In progress
 
@@ -20,9 +21,8 @@ As of 2026-11-14. Plan and stage order: `implementation-plan.md`.
 
 ## Open
 
-- Per-layer LighterGlue profile at batch 1 against batch 2 (`batch-throughput-results.md`).
 - `trtexec` and `onnxruntime_perf_test` cross-checks of headline latencies.
-- Bootstrap confidence intervals on AUC differences; INT8.
+- Bootstrap confidence intervals on AUC differences.
 - Behaviour without a system CUDA toolkit; timings rerun on idle native Linux (WSL2 numbers are
   dev-only).
 
@@ -33,4 +33,4 @@ Pi 5 and M2 Mac (ORT, CoreML EP), ablations (precision, resolution, K), Jetson O
 ## Research
 
 `research-method.md`, `research-export.md`, `research-runtimes.md`, `research-prior-art.md`,
-`research-measurement.md`.
+`research-measurement.md`, `research-low-precision.md`.
