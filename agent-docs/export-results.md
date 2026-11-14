@@ -1,11 +1,11 @@
-# C1 spike: in-graph XFeat post-processing and static LighterGlue export (U1, U9 input)
+# Export results: in-graph XFeat post-processing and static LighterGlue export
 
 Verdict: **go** for in-graph post-processing (NMS, TopK, descriptor sampling) and for the padded
 static LighterGlue graph. Both export with the dynamo exporter at opset 20 and match the reference
 on ORT CPU to within one tie-broken keypoint per image. Two graph rewrites are required for speed:
 dense reliability sampling through `Resize` instead of a dense `GridSample`, and `SpaceToDepth` /
-`DepthToSpace` instead of upstream's 6-D unfold/permute. TensorRT build of these files (U3, the
-TensorRT half of U9) is not covered here.
+`DepthToSpace` instead of upstream's 6-D unfold/permute. TensorRT build of these files (the
+chunked TopK build on TensorRT) is in `tensorrt-backend-results.md`.
 
 ## Setup
 
@@ -43,7 +43,7 @@ GridSample), read from source.
 - `_s2d`: `_unfold2d(x, 8)` replaced by `pixel_unshuffle` (exported through a
   `custom_translation_table` to ONNX `SpaceToDepth`), heatmap reshuffle by `pixel_shuffle`
   (exports as `DepthToSpace`). Both checked bit-identical to upstream in torch. Precedent: BCDL
-  XFeat port (pixel_unshuffle for `_unfold2d`, research 02). Without the translation table
+  XFeat port (pixel_unshuffle for `_unfold2d`, `research-export.md`). Without the translation table
   `pixel_unshuffle` lowers to Reshape/Transpose/Reshape.
 - Chunked top-K (`_chunked`), flag `ChunkedTopK(chunk_size=65536, max_k_per_op=2048)`:
   - Stage 1 is fabio-sim/LightGlue-ONNX `lightglue_dynamo/models/raco.py::_chunked_topk` at
@@ -68,7 +68,7 @@ FP16 (no NaN rows) and underflows to exactly 0 after `exp`. Log-assignment and t
 masked, and dustbins are not built (`filter_matches` never reads them). Pruning and early exit are
 off. Upstream's per-layer pruning code is not in the graph.
 
-## Export (U1)
+## Export
 
 | Graph | Result | Notes |
 | ----- | ------ | ----- |
@@ -179,18 +179,18 @@ p50 ms, default threads, inputs are real backbone outputs of pair0_0.
   conditions and not rerun here. LighterGlue stays the dominant cost, 3x XFeat at K = 2048 and
   10x at 4096.
 
-## Unknowns
+## Answers
 
-- **U1** settled for export and ORT CPU. Both static graphs export at opset 20, match at set
+- **Static graphs on ORT CPU:** settled. Both static graphs export at opset 20, match at set
   level (recall/precision ≥ 0.9995 at 1 px, cosine ≥ 0.999999, LG Jaccard 1.0 on identical inputs),
   and in-graph NMS costs about 2 ms vs a 50 to 115 ms backbone.
-- **U9** input only. The chunked K = 4096 graph uses TopK K ≤ 2048 throughout and matches plain
-  TopK on 10/10 images. Whether TensorRT builds it, and what it costs there, is for the TensorRT
-  agent. The plain K = 4096 graph is included to confirm the cap.
+- **Chunked TopK at K = 4096:** export side only. The chunked K = 4096 graph uses TopK K ≤ 2048
+  throughout and matches plain TopK on 10/10 images. TensorRT build and cost are in
+  `tensorrt-backend-results.md`. The plain K = 4096 graph is included to confirm the cap.
 - **New, not in the plan:**
   - upstream `_unfold2d` costs 43 ms on ORT CPU and is fixed by `SpaceToDepth`;
   - optocycle's dense `GridSample` costs 60 to 75 ms on ORT CPU and is fixed by `Resize`;
-  - opset 23 exports SDPA as ONNX `Attention` (fused-attention route for C2/C3 with a masked
+  - opset 23 exports SDPA as ONNX `Attention` (fused-attention route for later fusion work, with a masked
     probe still to do).
 
 ## Files for the TensorRT agent
@@ -257,7 +257,7 @@ Raw results are in `results/*.json` and the progress log in `logs/export.log`.
   - `SpaceToDepth` / `DepthToSpace` (custom translation table);
   - the `ChunkedTopK` flag (off by default on ORT, on for TensorRT at K ≥ 3840).
 - **Go**: static padded LighterGlue with explicit masked attention at opset 20. The opset-23
-  `Attention` route is worth a masked probe before C3 fusion work.
+  `Attention` route is worth a masked probe before fusion work.
 - Contract test: compare keypoints as sets. Allow at most one tie swap at the K-th score per image
   (score gap ≤ 1e-5 relative).
 - **Fallback** if a backend cannot run the post-processing (for example a TensorRT failure on

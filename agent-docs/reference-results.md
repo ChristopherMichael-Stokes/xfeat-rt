@@ -1,6 +1,6 @@
-# C0 results: reference pipeline
+# Reference results: pinned PyTorch pipeline
 
-Checkpoint C0 of `implementation-plan.md`. Gate 0 passes.
+The README AUC gate passes.
 
 ## Setup
 
@@ -16,7 +16,7 @@ Checkpoint C0 of `implementation-plan.md`. Gate 0 passes.
 - Command: `uv run --frozen xfeat-megadepth1500 --device <cpu|cuda> --grid <grid> --[no-]pruning
   --output-dir uncommitted/megadepth1500/<run>` from `reference/`.
 
-## Gate 0 and grid convention (CUDA)
+## README AUC gate and grid convention (CUDA)
 
 AUC of relative pose error at 5/10/20 degrees.
 
