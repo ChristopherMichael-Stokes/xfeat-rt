@@ -1,60 +1,33 @@
 # AGENTS.md: xfeat-rt
 
-XFeat feature extraction plus LighterGlue matching, made as fast as possible on CPU, CUDA GPUs and
-Apple MPS. A PyTorch reference defines correct behavior and exports the models; the runtime
-backends and the pipeline run the exported models without PyTorch.
+`ARCHITECTURE.md` holds what the system is: run modes, layout, the contract between workspaces and
+its invariants. Read it before changing code.
 
-Two run modes live side by side and may use different exports and code paths:
+## Rules
 
-- **Real-time:** batch 1, lowest latency per pair.
-- **Batch processing:** highest throughput (items per second); latency per item does not matter.
-  The batch size is picked per machine by measurement, not fixed.
-
-Pipelining around the models (thread pools, prefetching, overlapping I/O with inference) belongs
-to deployment code, not this repo. The repo provides models that take batches and serial tools
-built on them.
-
-Throughput benchmarks time the model code. Benchmark datasets (MegaDepth-1500 and the like) may be
-preprocessed once and the model inputs persisted in a gitignored `uncommitted/` directory.
-
-## Layout
-
-| Path         | uv workspace | Holds                                                     |
-| ------------ | ------------ | --------------------------------------------------------- |
-| `reference/` | yes          | PyTorch reference implementation and model export         |
-| `runtime/`   | yes          | `xfeat-core` (metadata, result types, glue), `xfeat-pairs` (pair manifest, preprocessing, prediction directory) and `xfeat-bench` (timing harness); no PyTorch |
-| `backends/<name>/` | no, one uv project each | One inference backend per directory; own lock, `.venv` and Python pin; never installed together |
-| `agent-docs/` | no          | Docs written by and for agents: briefs, plans, research reports |
-| root         | no           | Shared checks (`prek.toml`), `ruff.toml`, `Makefile`      |
-
-- Each workspace has its own `uv.lock` and `.venv`. Members live at
-  `<workspace>/packages/<dist-name>/src/<module>/` and are picked up by the `packages/*` glob.
-- Backends consume `runtime/` packages by path in development and as built wheels elsewhere.
-- The workspaces meet through exported model files and prediction directories. Test that contract
-  by exporting with `reference`, loading with a backend and reading the backend's predictions back.
-  `xfeat-evaluation` consumes `runtime/packages/xfeat-pairs` by path (pure Python, no torch) to read
-  predictions and manifests; `reference/` pins `numpy<2.4` for GlueFactory, which overrides the
-  runtime packages' own numpy floor there.
+- Check the affected `uv.lock` after adding a dependency: `runtime/` and `backends/` never pull in
+  PyTorch, even transitively.
+- Exported models are regenerated from `reference`, never committed.
+- Existing XFeat/LighterGlue code outside this repo is reference material only. Read it to
+  understand behavior; never copy it in.
+- Python tools run through `uv run` or `uvx`, never bare: the uv tool directory is not always on
+  `PATH`.
 
 ## Agent docs
 
-- `agent-docs/` holds session briefs, plans and research reports for agents. Human-facing docs
-  (`README.md`, any `docs/`) never link into it, and agent material never goes in them.
-- A brief is self-contained: a fresh session runs it with no access to the conversation that
-  wrote it.
-- Plans and reports a session produces land in `agent-docs/` beside the brief that asked for
-  them.
-
-## Hard constraints
-
-- **`runtime/` and `backends/` never depend on PyTorch**, directly or transitively. Check the
-  affected `uv.lock` after adding a dependency.
-- **Exported models are build outputs.** Regenerate them from `reference`; never commit them
-  (`.gitignore` covers the usual formats).
-- **Existing XFeat/LighterGlue code outside this repo is reference material only.** Read it to
-  understand behavior; never copy it in.
-- **Python:** 3.13 is the baseline (`.python-version`). `requires-python` stays open-ended
-  (`>=3.13`) with no upper bound: the aim is to build on the newest Python every backend supports.
+- `agent-docs/` holds session briefs, plans, results and research reports for agents. Human-facing
+  docs (`README.md`, `ARCHITECTURE.md`, any `docs/`) never link into it, and agent material never
+  goes in them.
+- `agent-docs/STATUS.md` holds current state in about 40 lines: what is done, what is in progress,
+  and which doc holds each line of work. A fresh session starts there.
+- One plan and one results doc per line of work (the TensorRT backend, batch processing, …),
+  updated in place. Never a new file per checkpoint or session. Research reports are one file per
+  question.
+- Docs, files and headings name stages by what they are ("the TensorRT backend stage"), never by
+  codes (stage letters and numbers, unknown or fork numbers).
+- A brief is self-contained: a fresh session runs it with no access to the conversation that wrote
+  it, in at most three reads.
+- Ideas raised mid-task go into `TODO.md` as one unchecked line under the section they belong to.
 
 ## Commands
 
@@ -62,10 +35,10 @@ Run from the repo root unless a workspace is named.
 
 | What                         | Command                                                |
 | ---------------------------- | ------------------------------------------------------ |
-| Install prek (once)          | `uv tool install prek@0.5.7`                           |
+| Install prek for the git hook (once) | `uv tool install prek@0.5.7`                   |
 | Sync both workspaces, hooks  | `make setup`                                           |
 | All checks                   | `make check`                                           |
-| Checks for one workspace     | `prek run --all-files runtime/`                        |
+| Checks for one workspace     | `uvx prek@0.5.7 run --all-files runtime/`              |
 | Update hook revisions        | `make update-hooks` (skips releases under 7 days old)  |
 | Types in one workspace       | `uv run --frozen ty check` from `reference/` or `runtime/` |
 | Add a dependency to a member | `uv add --package <dist-name> <dep>` from the workspace |
@@ -76,7 +49,7 @@ Run from the repo root unless a workspace is named.
 | CUDA latency                 | `uv run --frozen xfeat-trt-bench --help` from `backends/tensorrt/` (export with `--chunked-topk`; plain TopK costs ~5 ms on TensorRT) |
 | Batch ladder export          | `xfeat-export --chunked-topk --precision fp16 --batch 1 2 4 8 16 32 --out-dir <dir>` from `reference/`; one resolution, K and precision per directory |
 | CUDA batch-size calibration  | `uv run --frozen xfeat-trt-calibrate --models <ladder dir>` from `backends/tensorrt/` (stored per device, driver, TensorRT, build options and ONNX hashes; a second call reads it) |
-| CUDA inference-only pair throughput (development only) | `uv run --frozen python scripts/bench_pairs.py --models <ladder dir> --manifest <pairs.jsonl> --resize letterbox --input-store uncommitted/inputs --out-dir <dir>` from `backends/tensorrt/` (model inputs persisted by `scripts/input_store.py`; times model calls only: per pair at B1 with and without CUDA graphs, and every XFeat batch size of the ladder) |
+| CUDA inference-only pair throughput (development only) | `uv run --frozen python scripts/bench_pairs.py --models <ladder dir> --manifest <pairs.jsonl> --resize letterbox --input-store uncommitted/inputs --out-dir <dir>` from `backends/tensorrt/` (model inputs persisted by `scripts/input_store.py`; times model calls only: per pair at batch 1 with and without CUDA graphs, and every XFeat batch size of the ladder) |
 | CUDA batch predictions       | `uv run --frozen xfeat-trt-predict-batch --models <ladder dir> ...` from `backends/tensorrt/` (`--help`; calibrates on a miss) |
 | MegaDepth-1500 AUC           | `uv run --frozen xfeat-megadepth1500 --grid pixel_centre --no-pruning --output-dir uncommitted/megadepth1500/<run>` from `reference/` (`--help` for device, K, resize) |
 
