@@ -1,5 +1,6 @@
 """TensorRT engines for the exported XFeat and LighterGlue graphs."""
 
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
@@ -39,6 +40,7 @@ class XFeatModel:
         device = Device(device_index)
         device.set_current()
         loaded = load_or_build_engine(path, device, cache_dir, options)
+        self.built = loaded.built
         self.raw_metadata = loaded.metadata
         metadata = parse_metadata(self.raw_metadata)
         if not isinstance(metadata, XFeatMetadata):
@@ -81,6 +83,7 @@ class LighterGlueModel:
         device = Device(device_index)
         device.set_current()
         loaded = load_or_build_engine(path, device, cache_dir, options)
+        self.built = loaded.built
         self.raw_metadata = loaded.metadata
         metadata = parse_metadata(self.raw_metadata)
         if not isinstance(metadata, LighterGlueMetadata):
@@ -94,27 +97,36 @@ class LighterGlueModel:
         return pad_features(features, self.metadata.top_k)
 
     @staticmethod
-    def feeds(first: PaddedFeatures, second: PaddedFeatures) -> dict[str, npt.NDArray[np.generic]]:
-        """Engine inputs of one pair, with the batch axis added."""
+    def feeds(
+        pairs: Sequence[tuple[PaddedFeatures, PaddedFeatures]],
+    ) -> dict[str, npt.NDArray[np.generic]]:
+        """Engine inputs of a batch of pairs, stacked on the batch axis."""
         feeds = {}
-        for side, padded in enumerate((first, second)):
-            feeds[f"kpts{side}"] = padded.keypoints[None]
-            feeds[f"desc{side}"] = padded.descriptors[None]
-            feeds[f"valid{side}"] = padded.valid[None]
-            feeds[f"image_size{side}"] = padded.image_size[None]
+        for side in (0, 1):
+            padded = [pair[side] for pair in pairs]
+            feeds[f"kpts{side}"] = np.stack([features.keypoints for features in padded])
+            feeds[f"desc{side}"] = np.stack([features.descriptors for features in padded])
+            feeds[f"valid{side}"] = np.stack([features.valid for features in padded])
+            feeds[f"image_size{side}"] = np.stack([features.image_size for features in padded])
         return feeds
 
     def run_raw(
-        self, first: PaddedFeatures, second: PaddedFeatures
+        self, pairs: Sequence[tuple[PaddedFeatures, PaddedFeatures]]
     ) -> list[npt.NDArray[np.generic]]:
-        """Run the graph on one pair; returns m0 (1, K) and mscores0 (1, K)."""
-        outputs = self.runner.run(self.feeds(first, second))
+        """Run the graph on a batch of pairs; returns m0 (B, K) and mscores0 (B, K)."""
+        outputs = self.runner.run(self.feeds(pairs))
         return [_as_float32(outputs[name]) for name in LIGHTERGLUE_OUTPUTS]
 
-    def match(self, first: Features, second: Features) -> npt.NDArray[np.int64]:
-        """(M, 2) index pairs into `first` and `second` of the mutual matches."""
-        if self.metadata.batch != 1:
-            msg = "match takes one pair; this graph has batch > 1"
+    def match_batch(
+        self, pairs: Sequence[tuple[Features, Features]]
+    ) -> list[npt.NDArray[np.int64]]:
+        """(M, 2) index pairs of the mutual matches of each pair; takes exactly B pairs."""
+        if len(pairs) != self.metadata.batch:
+            msg = f"{len(pairs)} pairs given; this graph takes {self.metadata.batch}"
             raise ValueError(msg)
-        matches0 = self.run_raw(self.pad(first), self.pad(second))[0]
-        return match_pairs(np.asarray(matches0[0], dtype=np.int64))
+        matches0 = self.run_raw([(self.pad(first), self.pad(second)) for first, second in pairs])[0]
+        return [match_pairs(np.asarray(row, dtype=np.int64)) for row in matches0]
+
+    def match(self, first: Features, second: Features) -> npt.NDArray[np.int64]:
+        """(M, 2) index pairs into `first` and `second` of the mutual matches; batch-1 graphs."""
+        return self.match_batch([(first, second)])[0]

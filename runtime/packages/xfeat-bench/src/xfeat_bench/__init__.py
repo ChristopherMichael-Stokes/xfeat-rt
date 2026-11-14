@@ -1,1 +1,1 @@
-"""Timing harness shared by the inference backends."""
+"""Timing harness and batch-size calibration shared by the inference backends."""

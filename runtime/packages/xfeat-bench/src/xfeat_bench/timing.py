@@ -1,6 +1,7 @@
-"""Latency measurement with raw samples, percentiles and run conditions."""
+"""Latency and throughput measurement with raw samples, percentiles and run conditions."""
 
 import json
+import math
 import os
 import platform
 import time
@@ -13,6 +14,7 @@ import numpy as np
 
 PERCENTILES = (50.0, 95.0, 99.0)
 NANOSECONDS_PER_MILLISECOND = 1_000_000
+NANOSECONDS_PER_SECOND = 1_000_000_000
 
 
 @dataclass(frozen=True)
@@ -30,6 +32,16 @@ class RunConditions:
     logical_cpus: int
     platform: str
     python: str
+
+
+def current_conditions() -> RunConditions:
+    """The machine state right now."""
+    return RunConditions(
+        load_average=os.getloadavg(),
+        logical_cpus=os.cpu_count() or 0,
+        platform=platform.platform(),
+        python=platform.python_version(),
+    )
 
 
 @dataclass(frozen=True)
@@ -78,13 +90,42 @@ def measure(
         start = time.perf_counter_ns()
         call()
         samples_ms.append((time.perf_counter_ns() - start) / NANOSECONDS_PER_MILLISECOND)
-    conditions = RunConditions(
-        load_average=os.getloadavg(),
-        logical_cpus=os.cpu_count() or 0,
-        platform=platform.platform(),
-        python=platform.python_version(),
-    )
-    return Measurement(name, samples_ms, warmup, settings, conditions)
+    return Measurement(name, samples_ms, warmup, settings, current_conditions())
+
+
+def measure_throughput(
+    call: Callable[[], object],
+    *,
+    items_per_call: int,
+    warmup_seconds: float,
+    repeats: int,
+    repeat_seconds: float,
+) -> tuple[float, ...]:
+    """Items per second of `call`, one value per repeat.
+
+    Calls are made and discarded for `warmup_seconds` first (at least one), since GPU clocks ramp
+    up under load; their mean time sizes each repeat to about `repeat_seconds` (at least one
+    call). `call` must return only when its work is finished.
+    """
+    warmup_ns = warmup_seconds * NANOSECONDS_PER_SECOND
+    warmup_calls = 0
+    start = time.perf_counter_ns()
+    while True:
+        call()
+        warmup_calls += 1
+        warmup_elapsed_ns = time.perf_counter_ns() - start
+        if warmup_elapsed_ns >= warmup_ns:
+            break
+    mean_call_ns = max(warmup_elapsed_ns / warmup_calls, 1)  # a call under the clock's resolution
+    calls = max(1, math.ceil(repeat_seconds * NANOSECONDS_PER_SECOND / mean_call_ns))
+    throughputs = []
+    for _ in range(repeats):
+        start = time.perf_counter_ns()
+        for _ in range(calls):
+            call()
+        elapsed_seconds = (time.perf_counter_ns() - start) / NANOSECONDS_PER_SECOND
+        throughputs.append(items_per_call * calls / elapsed_seconds)
+    return tuple(throughputs)
 
 
 def write_results(measurements: list[Measurement], directory: Path) -> Path:

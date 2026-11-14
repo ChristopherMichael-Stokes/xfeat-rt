@@ -9,12 +9,7 @@ from xfeat_pairs.manifest import load_manifest
 from xfeat_pairs.predictions import RunHeader, write_predictions
 from xfeat_pairs.preprocess import ResizeMode
 from xfeat_pairs.run import predict_pairs
-from xfeat_trt.engine import (
-    DEFAULT_CACHE_DIR,
-    DEFAULT_OPTIMIZATION_LEVEL,
-    MAX_OPTIMIZATION_LEVEL,
-    BuildOptions,
-)
+from xfeat_trt.arguments import add_engine_arguments, build_options
 from xfeat_trt.models import LighterGlueModel, XFeatModel
 
 
@@ -26,19 +21,9 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--resize", type=ResizeMode, choices=list(ResizeMode), required=True)
-    parser.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE_DIR)
-    parser.add_argument(
-        "--tf32", action="store_true", help="allow TF32 in FP32 layers (faster, less precise)"
-    )
-    parser.add_argument(
-        "--optimization-level",
-        type=int,
-        default=DEFAULT_OPTIMIZATION_LEVEL,
-        choices=range(MAX_OPTIMIZATION_LEVEL + 1),
-        help="TensorRT builder optimization level (higher builds slower, runs faster)",
-    )
+    add_engine_arguments(parser)
     args = parser.parse_args()
-    options = BuildOptions(args.tf32, args.optimization_level)
+    options = build_options(args)
 
     xfeat = XFeatModel(args.xfeat, args.cache_dir, options)
     lighterglue = LighterGlueModel(args.lighterglue, args.cache_dir, options)

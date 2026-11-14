@@ -7,23 +7,11 @@ from pathlib import Path
 import numpy as np
 
 from xfeat_bench.timing import Measurement, measure, write_results
-from xfeat_core.features import Features
-from xfeat_trt.engine import (
-    DEFAULT_CACHE_DIR,
-    DEFAULT_OPTIMIZATION_LEVEL,
-    MAX_OPTIMIZATION_LEVEL,
-    BuildOptions,
-)
+from xfeat_trt.arguments import add_engine_arguments, build_options
 from xfeat_trt.models import LighterGlueModel, XFeatModel
+from xfeat_trt.random_inputs import random_features, random_images
 
 RANDOM_SEED = 0
-
-
-def _random_features(count: int, size: tuple[int, int], rng: np.random.Generator) -> Features:
-    descriptors = rng.standard_normal((count, 64)).astype(np.float32)
-    descriptors /= np.linalg.norm(descriptors, axis=1, keepdims=True)
-    keypoints = (rng.random((count, 2)) * (np.asarray(size) - 1)).astype(np.float32)
-    return Features(keypoints, np.ones(count, dtype=np.float32), descriptors, size)
 
 
 def main() -> None:
@@ -38,37 +26,22 @@ def main() -> None:
     parser.add_argument("--lighterglue", type=Path, required=True)
     parser.add_argument("--image", type=Path, help=".npy gray image; random noise if omitted")
     parser.add_argument("--graph", action="store_true", help="execute through a CUDA graph")
-    parser.add_argument("--cache-dir", type=Path, default=DEFAULT_CACHE_DIR)
-    parser.add_argument(
-        "--tf32", action="store_true", help="allow TF32 in FP32 layers (faster, less precise)"
-    )
-    parser.add_argument(
-        "--optimization-level",
-        type=int,
-        default=DEFAULT_OPTIMIZATION_LEVEL,
-        choices=range(MAX_OPTIMIZATION_LEVEL + 1),
-        help="TensorRT builder optimization level (higher builds slower, runs faster)",
-    )
+    add_engine_arguments(parser)
     parser.add_argument("--warmup", type=int, default=20)
     parser.add_argument("--runs", type=int, default=100)
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args()
-    options = BuildOptions(args.tf32, args.optimization_level)
+    options = build_options(args)
 
     rng = np.random.default_rng(RANDOM_SEED)
     xfeat = XFeatModel(args.xfeat, args.cache_dir, options)
     lighterglue = LighterGlueModel(args.lighterglue, args.cache_dir, options)
     meta = xfeat.metadata
-    shape = (meta.batch, 1, meta.height, meta.width)
-    images = (
-        np.load(args.image).astype(np.float32)
-        if args.image
-        else rng.random(shape, dtype=np.float32)
-    )
+    images = np.load(args.image).astype(np.float32) if args.image else random_images(meta, rng)
     size = (meta.width, meta.height)
-    first = lighterglue.pad(_random_features(lighterglue.metadata.top_k, size, rng))
-    second = lighterglue.pad(_random_features(lighterglue.metadata.top_k, size, rng))
-    feeds = lighterglue.feeds(first, second)
+    first = lighterglue.pad(random_features(lighterglue.metadata.top_k, size, rng))
+    second = lighterglue.pad(random_features(lighterglue.metadata.top_k, size, rng))
+    feeds = lighterglue.feeds([(first, second)] * lighterglue.metadata.batch)
     settings = {
         "top_k": str(meta.top_k),
         "batch": str(meta.batch),

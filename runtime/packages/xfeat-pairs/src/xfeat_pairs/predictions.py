@@ -53,7 +53,8 @@ class PredictionIndex(_Frozen):
         lighterglue: Raw `metadata_props` of the LighterGlue graph.
         settings: Backend settings that affect results (precision, options).
         pairs: Entries in manifest order; `extract_ms` and `match_ms` are the wall time of feature
-            extraction of both images and of matching, including host-device transfers.
+            extraction of both images and of matching, including host-device transfers, or their
+            amortised shares in a batched run (`xfeat_pairs.run.predict_pairs_batched`).
     """
 
     format_version: Literal[1]

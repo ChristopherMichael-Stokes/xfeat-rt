@@ -1,4 +1,8 @@
-"""`xfeat-export`: write the XFeat and LighterGlue ONNX files for one shape and keypoint budget."""
+"""`xfeat-export`: write XFeat and LighterGlue ONNX files for one shape and keypoint budget.
+
+One file pair is written per batch size, so `--batch 1 2 4 8` gives the ladder that
+batch-size calibration sweeps.
+"""
 
 import argparse
 from pathlib import Path
@@ -128,7 +132,9 @@ def main() -> None:
     parser.add_argument("--height", type=int, default=960)
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--top-k", type=int, required=True)
-    parser.add_argument("--batch", type=int, default=1)
+    parser.add_argument(
+        "--batch", type=int, nargs="+", default=[1], help="one file pair per batch size"
+    )
     parser.add_argument(
         "--chunked-topk",
         action="store_true",
@@ -148,25 +154,26 @@ def main() -> None:
     config = ReferenceConfig(grid=GRID, pruning=False, top_k=args.top_k)
     pipeline = ReferencePipeline(config, torch.device("cpu"))
     chunking = DEFAULT_CHUNKING if args.chunked_topk else None
-    for path in (
-        export_xfeat(
-            pipeline.xfeat_network,
-            args.out_dir,
-            height=args.height,
-            width=args.width,
-            top_k=args.top_k,
-            batch=args.batch,
-            chunking=chunking,
-            precision=args.precision,
-        ),
-        export_lighterglue(
-            pipeline.lighterglue_network,
-            args.out_dir,
-            top_k=args.top_k,
-            batch=args.batch,
-            width=args.width,
-            height=args.height,
-            precision=args.precision,
-        ),
-    ):
-        print(path)  # noqa: T201  # CLI output
+    for batch in args.batch:
+        for path in (
+            export_xfeat(
+                pipeline.xfeat_network,
+                args.out_dir,
+                height=args.height,
+                width=args.width,
+                top_k=args.top_k,
+                batch=batch,
+                chunking=chunking,
+                precision=args.precision,
+            ),
+            export_lighterglue(
+                pipeline.lighterglue_network,
+                args.out_dir,
+                top_k=args.top_k,
+                batch=batch,
+                width=args.width,
+                height=args.height,
+                precision=args.precision,
+            ),
+        ):
+            print(path)  # noqa: T201  # CLI output

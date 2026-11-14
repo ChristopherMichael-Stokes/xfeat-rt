@@ -7,6 +7,9 @@ import numpy.typing as npt
 import tensorrt as trt
 from cuda.core import Device, PinnedMemoryResource
 
+# cuda.core raises CUDAError but exports it only from this private module
+from cuda.core._utils.cuda_utils import CUDAError
+
 NUMPY_DTYPES: dict[trt.DataType, type[np.generic]] = {
     trt.DataType.FLOAT: np.float32,
     trt.DataType.HALF: np.float16,
@@ -16,6 +19,10 @@ NUMPY_DTYPES: dict[trt.DataType, type[np.generic]] = {
 }
 
 
+class EngineAllocationError(RuntimeError):
+    """The execution context or an I/O buffer of an engine could not be allocated."""
+
+
 class EngineRunner:
     """Owns the stream, execution context and I/O buffers of one static-shape engine.
 
@@ -23,10 +30,18 @@ class EngineRunner:
     """
 
     def __init__(self, engine: trt.ICudaEngine, device: Device) -> None:
-        """Allocate buffers for every I/O tensor of `engine` on `device`."""
+        """Allocate buffers for every I/O tensor of `engine` on `device`.
+
+        Raises:
+            EngineAllocationError: If device or pinned host memory runs out.
+        """
         device.set_current()
         self._stream = device.create_stream()
-        self._context = engine.create_execution_context()
+        context = engine.create_execution_context()
+        if context is None:
+            msg = "TensorRT cannot create an execution context (device memory)"
+            raise EngineAllocationError(msg)
+        self._context = context
         self._graph = None
         pinned = PinnedMemoryResource()
         self._device_buffers = {}
@@ -44,8 +59,12 @@ class EngineRunner:
                 raise ValueError(msg)
             dtype = np.dtype(NUMPY_DTYPES[engine.get_tensor_dtype(name)])
             size = int(np.prod(shape)) * dtype.itemsize
-            self._device_buffers[name] = device.allocate(size, stream=self._stream)
-            self._host_buffers[name] = pinned.allocate(size, stream=self._stream)
+            try:
+                self._device_buffers[name] = device.allocate(size, stream=self._stream)
+                self._host_buffers[name] = pinned.allocate(size, stream=self._stream)
+            except CUDAError as error:
+                msg = f"cannot allocate {size} bytes for tensor {name}: {error}"
+                raise EngineAllocationError(msg) from error
             self.host[name] = np.from_dlpack(self._host_buffers[name]).view(dtype).reshape(shape)
             self._context.set_tensor_address(name, int(self._device_buffers[name].handle))
             is_input = engine.get_tensor_mode(name) == trt.TensorIOMode.INPUT

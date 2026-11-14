@@ -111,3 +111,25 @@ uv run --frozen xfeat-score --predictions trt --manifest pairs.jsonl --reference
 
 `--resize` fits each image to the exported size: `letterbox` keeps the aspect ratio and pads,
 `stretch` ignores it. MegaDepth-1500 has its own manifest writer, `xfeat-megadepth1500-manifest`.
+
+## Batch processing
+
+For throughput rather than latency, export a ladder of batch sizes into its own directory and let
+the TensorRT backend pick the batch size per model on this machine:
+
+```sh
+cd reference
+uv run --frozen xfeat-export --top-k 2048 --chunked-topk --precision fp16 \
+  --batch 1 2 4 8 16 32 --out-dir uncommitted/ladder
+cd ../backends/tensorrt
+uv run --frozen xfeat-trt-calibrate --models ../../reference/uncommitted/ladder
+uv run --frozen xfeat-trt-predict-batch --models ../../reference/uncommitted/ladder \
+  --manifest pairs.jsonl --resize letterbox --out-dir trt-batch
+```
+
+`xfeat-trt-calibrate` times each batch size end to end and keeps the smallest one within
+measurement noise of the best throughput; the result is stored with the engine cache and reused
+until the GPU, driver, TensorRT version, build options or models change.
+`xfeat-trt-predict-batch` runs the calibration first if there is none, extracts each unique image
+once and writes the same prediction directory as `xfeat-trt-predict`. Its per-pair times are
+shares of the batched calls.

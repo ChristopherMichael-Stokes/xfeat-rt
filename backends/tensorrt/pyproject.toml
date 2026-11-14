@@ -16,7 +16,9 @@ dependencies = [
 
 [project.scripts]
 xfeat-trt-bench = "xfeat_trt.bench:main"
+xfeat-trt-calibrate = "xfeat_trt.calibrate:main"
 xfeat-trt-predict = "xfeat_trt.predict:main"
+xfeat-trt-predict-batch = "xfeat_trt.predict_batch:main"
 
 [dependency-groups]
 dev = ["pytest>=9.1.1", "ty>=0.0.91"]
@@ -25,9 +27,12 @@ dev = ["pytest>=9.1.1", "ty>=0.0.91"]
 requires = ["uv_build>=0.13.5,<0.14.0"]
 build-backend = "uv_build"
 
+[tool.pytest.ini_options]
+pythonpath = ["scripts"]
+
 [tool.ty.environment]
 python-version = "3.13"
-extra-paths = ["stubs"]
+extra-paths = ["stubs", "scripts"]
 
 [tool.ty.rules]
 all = "error"

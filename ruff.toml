@@ -31,4 +31,6 @@ convention = "google"
 
 [lint.per-file-ignores]
 "**/tests/**" = ["S101", "PLR2004", "D1", "SLF001", "INP001", "ANN"]
+# development scripts run as files, not imported as a package
+"backends/*/scripts/*.py" = ["INP001"]
 "**/*.ipynb" = ["T201", "D100", "D103", "E402", "INP001", "B018", "ERA001"]

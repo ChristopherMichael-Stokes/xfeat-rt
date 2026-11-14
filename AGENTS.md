@@ -4,6 +4,19 @@ XFeat feature extraction plus LighterGlue matching, made as fast as possible on 
 Apple MPS. A PyTorch reference defines correct behavior and exports the models; the runtime
 backends and the pipeline run the exported models without PyTorch.
 
+Two run modes live side by side and may use different exports and code paths:
+
+- **Real-time:** batch 1, lowest latency per pair.
+- **Batch processing:** highest throughput (items per second); latency per item does not matter.
+  The batch size is picked per machine by measurement, not fixed.
+
+Pipelining around the models (thread pools, prefetching, overlapping I/O with inference) belongs
+to deployment code, not this repo. The repo provides models that take batches and serial tools
+built on them.
+
+Throughput benchmarks time the model code. Benchmark datasets (MegaDepth-1500 and the like) may be
+preprocessed once and the model inputs persisted in a gitignored `uncommitted/` directory.
+
 ## Layout
 
 | Path         | uv workspace | Holds                                                     |
@@ -61,6 +74,10 @@ Run from the repo root unless a workspace is named.
 | Export models                | `make export TOP_K=2048` (writes `reference/uncommitted/models/`); `xfeat-export --chunked-topk --precision fp16` from `reference/` for TensorRT |
 | CPU latency                  | `uv run --frozen xfeat-ort-bench --help` from `backends/ort/` |
 | CUDA latency                 | `uv run --frozen xfeat-trt-bench --help` from `backends/tensorrt/` (export with `--chunked-topk`; plain TopK costs ~5 ms on TensorRT) |
+| Batch ladder export          | `xfeat-export --chunked-topk --precision fp16 --batch 1 2 4 8 16 32 --out-dir <dir>` from `reference/`; one resolution, K and precision per directory |
+| CUDA batch-size calibration  | `uv run --frozen xfeat-trt-calibrate --models <ladder dir>` from `backends/tensorrt/` (stored per device, driver, TensorRT, build options and ONNX hashes; a second call reads it) |
+| CUDA inference-only pair throughput (development only) | `uv run --frozen python scripts/bench_pairs.py --models <ladder dir> --manifest <pairs.jsonl> --resize letterbox --input-store uncommitted/inputs --out-dir <dir>` from `backends/tensorrt/` (model inputs persisted by `scripts/input_store.py`; times model calls only: per pair at B1 with and without CUDA graphs, and every XFeat batch size of the ladder) |
+| CUDA batch predictions       | `uv run --frozen xfeat-trt-predict-batch --models <ladder dir> ...` from `backends/tensorrt/` (`--help`; calibrates on a miss) |
 | MegaDepth-1500 AUC           | `uv run --frozen xfeat-megadepth1500 --grid pixel_centre --no-pruning --output-dir uncommitted/megadepth1500/<run>` from `reference/` (`--help` for device, K, resize) |
 
 ## Checks
