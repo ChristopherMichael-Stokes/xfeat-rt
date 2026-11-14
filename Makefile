@@ -1,14 +1,17 @@
 .PHONY: setup check test export update-hooks
 
+# uv tool directory is not always on PATH
+PREK := uvx prek@0.5.7
+
 setup:
 	uv sync --project reference --all-packages --locked
 	uv sync --project runtime --all-packages --locked
 	uv sync --project backends/ort --locked
 	uv sync --project backends/tensorrt --locked
-	prek install
+	$(PREK) install
 
 check:
-	prek run --all-files
+	$(PREK) run --all-files
 
 test:
 	cd reference && uv run --frozen pytest packages
@@ -19,4 +22,4 @@ export:
 	cd reference && uv run --frozen xfeat-export --top-k $(TOP_K) --out-dir uncommitted/models
 
 update-hooks:
-	prek update --cooldown-days 7
+	$(PREK) update --cooldown-days 7
