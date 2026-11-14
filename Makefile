@@ -18,8 +18,10 @@ test:
 	cd runtime && uv run --frozen pytest packages
 	cd backends/tensorrt && uv run --frozen pytest tests
 
+# TODO: separate export targets per backend. This target writes the chunked TopK graph that
+# TensorRT needs; ORT consumes the same files and has not been measured on them.
 export:
-	cd reference && uv run --frozen xfeat-export --top-k $(TOP_K) --out-dir uncommitted/models
+	cd reference && uv run --frozen xfeat-export --top-k $(TOP_K) --chunked-topk --out-dir uncommitted/models
 
 update-hooks:
 	$(PREK) update --cooldown-days 7
