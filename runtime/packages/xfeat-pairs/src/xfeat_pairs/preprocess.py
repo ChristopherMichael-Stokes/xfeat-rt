@@ -66,7 +66,7 @@ def prepare_image(path: Path, model_size: tuple[int, int], mode: ResizeMode) -> 
         fit = min(model_width / width, model_height / height)
         content_size = (round(width * fit), round(height * fit))
     resized = cv2.resize(rgb, content_size, interpolation=cv2.INTER_LINEAR)
-    content = resized.astype(np.float32).mean(axis=2) / MAX_PIXEL_VALUE
+    content = _channel_mean(resized.astype(np.uint8, copy=False)) / MAX_PIXEL_VALUE
 
     offset = ((model_width - content_size[0]) // 2, (model_height - content_size[1]) // 2)
     canvas = np.zeros((model_height, model_width), dtype=np.float32)
@@ -75,6 +75,15 @@ def prepare_image(path: Path, model_size: tuple[int, int], mode: ResizeMode) -> 
     )
     scale = (content_size[0] / width, content_size[1] / height)
     return PreparedImage(canvas[None, None], (width, height), scale, offset)
+
+
+def _channel_mean(rgb: npt.NDArray[np.uint8]) -> npt.NDArray[np.float32]:
+    """Float32 channel mean of an 8-bit RGB image, bit for bit `rgb.astype(np.float32).mean(2)`."""
+    # sum of three 8-bit values is an exact integer, so only the division rounds, as in numpy's
+    # mean; numpy over a length-3 axis is about 10x slower
+    red_green = cv2.add(rgb[..., 0], rgb[..., 1], dtype=cv2.CV_16U)
+    channel_sum = cv2.add(red_green, rgb[..., 2], dtype=cv2.CV_16U)
+    return channel_sum.astype(np.float32) / np.float32(rgb.shape[2])
 
 
 def to_original_coordinates(

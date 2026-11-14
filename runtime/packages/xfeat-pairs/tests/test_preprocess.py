@@ -26,6 +26,15 @@ def test_gray_is_the_channel_mean_in_unit_range(tmp_path: Path) -> None:
     np.testing.assert_allclose(prepared.pixels, 1 / 3, atol=1e-6)
 
 
+def test_gray_equals_float32_channel_mean_bit_for_bit(tmp_path: Path) -> None:
+    rgb = np.random.default_rng(0).integers(0, 256, (37, 53, 3), dtype=np.uint8)
+    path = tmp_path / "noise.png"
+    assert cv2.imwrite(str(path), cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR))
+    prepared = prepare_image(path, (53, 37), ResizeMode.STRETCH)
+    expected = rgb.astype(np.float32).mean(axis=2) / 255.0
+    np.testing.assert_array_equal(prepared.pixels[0, 0], expected)
+
+
 def test_letterbox_centres_content_and_leaves_margin_empty(tmp_path: Path) -> None:
     path = tmp_path / "wide.png"
     _write_rgb(path, 200, 100, (102, 102, 102))
