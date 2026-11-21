@@ -19,7 +19,6 @@ As of 2026-11-21. Plan and stage order: `implementation-plan.md`.
 - Core ML backend (Apple silicon, real-time): `xfeat-export --target coreml` and `--provider coreml`
   on `xfeat-ort-predict` / `xfeat-ort-bench`; 15 ms XFeat, 32 ms LighterGlue at K = 2048 FP16 on an
   M2, AUC on par with FP32 CPU. Open: Core ML cache invalidation. `coreml-backend-results.md`.
-- MLX backend spike (Apple silicon): running in a separate worktree, not merged.
 - `test_keypoints_agree_up_to_tie_swaps[ort-k4096-chunked]` fails on macOS (tie gap 1.95e-5 against
   a 1e-5 bound), also on the commit before the Core ML work.
 - ORT CPU runs the TensorRT-target graph; ORT CPU on the Core ML-target graph is unmeasured.

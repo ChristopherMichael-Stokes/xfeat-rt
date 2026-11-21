@@ -22,8 +22,14 @@ fed by a Mac export variant of the same reference modules:
 
 Rejected, with the evidence below: native Core ML through coremltools (no faster, Python 3.13 only,
 XFeat does not convert), PyTorch MPS (slower, and PyTorch is barred from backends), the Neural
-Engine for LighterGlue (slower, changes matches), MLX (needs both models rewritten by hand; not
-tried).
+Engine for LighterGlue (slower, changes matches), MLX (below).
+
+MLX, both models rewritten by hand (about 1500 lines), discarded unmerged on 2026-11-21. K 2048 FP16
+on the M2 at load average 2.2 to 2.5, p50 of 100 calls over 3 rounds alternating with Core ML: MLX
+XFeat 16.4 ms, LighterGlue 28.5 ms, 61.3 ms per pair; Core ML 15.4, 32.0, 62.8 ms. MegaDepth-1500
+AUC@5 0.5608 (FP16 K 2048), match Jaccard 0.954 against CPU FP32. The 1.5 ms lead needed an
+unpublished two-stage top-k (per-chunk top 64, bound check, full top-k fallback); with the plain
+top-k (+2.2 ms per image) MLX is slower than Core ML.
 
 ## Why the current export is slow on the EP
 
