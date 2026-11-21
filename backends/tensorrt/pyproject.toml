@@ -3,12 +3,13 @@ name = "xfeat-trt"
 version = "0.1.0"
 description = "XFeat and LighterGlue inference on TensorRT."
 requires-python = ">=3.13"
+# TensorRT and CUDA have no macOS wheels; ty checks against `stubs/` there
 dependencies = [
-  "cuda-python>=13.4.4",
+  "cuda-python>=13.4.4; sys_platform != 'darwin'",
   "numpy>=2.5.4",
   "onnx>=1.23.2",
-  "tensorrt-cu13>=11.4.0.106",
-  "tensorrt-cu13-libs>=11.4.0.106",
+  "tensorrt-cu13>=11.4.0.106; sys_platform != 'darwin'",
+  "tensorrt-cu13-libs>=11.4.0.106; sys_platform != 'darwin'",
   "xfeat-bench",
   "xfeat-core",
   "xfeat-pairs",

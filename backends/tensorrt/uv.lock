@@ -554,11 +554,11 @@ name = "xfeat-trt"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "cuda-python" },
+    { name = "cuda-python", marker = "sys_platform != 'darwin'" },
     { name = "numpy" },
     { name = "onnx" },
-    { name = "tensorrt-cu13" },
-    { name = "tensorrt-cu13-libs" },
+    { name = "tensorrt-cu13", marker = "sys_platform != 'darwin'" },
+    { name = "tensorrt-cu13-libs", marker = "sys_platform != 'darwin'" },
     { name = "xfeat-bench" },
     { name = "xfeat-core" },
     { name = "xfeat-pairs" },
@@ -572,11 +572,11 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "cuda-python", specifier = ">=13.4.4" },
+    { name = "cuda-python", marker = "sys_platform != 'darwin'", specifier = ">=13.4.4" },
     { name = "numpy", specifier = ">=2.5.4" },
     { name = "onnx", specifier = ">=1.23.2" },
-    { name = "tensorrt-cu13", specifier = ">=11.4.0.106" },
-    { name = "tensorrt-cu13-libs", specifier = ">=11.4.0.106", index = "https://pypi.nvidia.com/" },
+    { name = "tensorrt-cu13", marker = "sys_platform != 'darwin'", specifier = ">=11.4.0.106" },
+    { name = "tensorrt-cu13-libs", marker = "sys_platform != 'darwin'", specifier = ">=11.4.0.106", index = "https://pypi.nvidia.com/" },
     { name = "xfeat-bench", editable = "../../runtime/packages/xfeat-bench" },
     { name = "xfeat-core", editable = "../../runtime/packages/xfeat-core" },
     { name = "xfeat-pairs", editable = "../../runtime/packages/xfeat-pairs" },
