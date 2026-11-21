@@ -5,7 +5,7 @@ from pathlib import Path
 
 import onnxruntime
 
-from xfeat_ort.models import LighterGlueModel, XFeatModel
+from xfeat_ort.options import add_model_arguments, load_models, provider_settings
 from xfeat_pairs.manifest import load_manifest
 from xfeat_pairs.predictions import RunHeader, write_predictions
 from xfeat_pairs.preprocess import ResizeMode
@@ -15,16 +15,13 @@ from xfeat_pairs.run import predict_pairs
 def main() -> None:
     """Entry point of `xfeat-ort-predict`; see `xfeat_pairs.manifest` for the manifest format."""
     parser = argparse.ArgumentParser(description=main.__doc__)
-    parser.add_argument("--xfeat", type=Path, required=True)
-    parser.add_argument("--lighterglue", type=Path, required=True)
+    add_model_arguments(parser)
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--out-dir", type=Path, required=True)
     parser.add_argument("--resize", type=ResizeMode, choices=list(ResizeMode), required=True)
-    parser.add_argument("--threads", type=int, default=0)
     args = parser.parse_args()
 
-    xfeat = XFeatModel(args.xfeat, args.threads)
-    lighterglue = LighterGlueModel(args.lighterglue, args.threads)
+    xfeat, lighterglue = load_models(args)
     meta = xfeat.metadata
     model_size = (meta.width, meta.height)
     header = RunHeader(
@@ -33,7 +30,7 @@ def main() -> None:
         model_size=model_size,
         xfeat=xfeat.raw_metadata,
         lighterglue=lighterglue.raw_metadata,
-        settings={"threads": str(args.threads)},
+        settings={"threads": str(args.threads), **provider_settings(args)},
     )
     results = predict_pairs(
         load_manifest(args.manifest),

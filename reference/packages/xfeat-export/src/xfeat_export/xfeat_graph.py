@@ -9,6 +9,7 @@ d12b4ba1632f558234e3f084e1f3d8bdf9147890.
 
 import copy
 import math
+from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any, override
 
@@ -136,11 +137,19 @@ class StaticXFeat(nn.Module):
     ) -> None:
         """Wrap `network` (a copy is patched, the argument is left unchanged)."""
         super().__init__()
-        self.network = _with_pixel_unshuffle(network).to(precision.dtype)
+        self.network = _with_unfold2d(network, self._unfold2d_replacement()).to(precision.dtype)
         self.compute_dtype = precision.dtype
         self.height, self.width, self.top_k = height, width, top_k
         self.detection_threshold = detection_threshold
         self.chunking = chunking
+
+    def _unfold2d_replacement(self) -> Callable[[torch.Tensor, int], torch.Tensor]:
+        """Function that replaces upstream's `_unfold2d` on the copied network."""
+        return _unfold_as_pixel_unshuffle
+
+    def _normalize(self, x: torch.Tensor, dim: int) -> torch.Tensor:
+        """L2 normalisation along `dim`."""
+        return functional.normalize(x, dim=dim)
 
     @override
     def forward(  # ty: ignore[invalid-mutable-override]  # torch types forward as a writable attribute
@@ -150,7 +159,7 @@ class StaticXFeat(nn.Module):
         features, logits, reliability = (
             output.to(torch.float32) for output in self.network(image.to(self.compute_dtype))
         )
-        features = functional.normalize(features, dim=1)
+        features = self._normalize(features, 1)
         heatmap = functional.pixel_shuffle(functional.softmax(logits, 1)[:, :64], HEATMAP_CELL)
         peaks = peak_mask(heatmap, self.detection_threshold)
         # pixel_centre: upstream's `nearest` sample of the full-resolution heatmap is the pixel
@@ -171,11 +180,15 @@ class StaticXFeat(nn.Module):
         valid = scores > 0
         grid = pixel_centre_grid(keypoints, self.height, self.width)[:, :, None, :]
         descriptors = functional.grid_sample(features, grid, mode="bicubic", align_corners=False)
-        descriptors = functional.normalize(descriptors[..., 0].permute(0, 2, 1), dim=-1)
+        descriptors = self._normalize(descriptors[..., 0].permute(0, 2, 1), -1)
         return keypoints, torch.where(valid, scores, 0.0), descriptors, valid
 
 
-def _with_pixel_unshuffle(network: Any) -> Any:  # noqa: ANN401  # see StaticXFeat.__init__
+def _with_unfold2d(
+    network: Any,  # noqa: ANN401  # see StaticXFeat.__init__
+    unfold2d: Callable[[torch.Tensor, int], torch.Tensor],
+) -> Any:  # noqa: ANN401  # see StaticXFeat.__init__
     patched = copy.deepcopy(network).eval()
-    patched._unfold2d = _unfold_as_pixel_unshuffle  # noqa: SLF001  # upstream seam, no other hook
+    # a plain function: a Module assigned to `_unfold2d` is silently ignored by upstream's call
+    patched._unfold2d = unfold2d  # noqa: SLF001  # upstream seam, no other hook
     return patched

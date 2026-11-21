@@ -15,6 +15,10 @@ uv tool install prek@0.5.7
 make setup
 ```
 
+`make setup` syncs `reference`, `runtime` and the backends with wheels for the machine: `ort` on
+macOS arm64, `ort` and `tensorrt` on Linux x86_64 and aarch64. `make setup BACKENDS="ort"` picks
+them explicitly; `make test` runs the tests of the same backends.
+
 ## Checks
 
 ```sh
@@ -27,8 +31,35 @@ make check
 make export TOP_K=2048
 ```
 
-writes the FP16 XFeat and LighterGlue graphs that TensorRT runs to `reference/uncommitted/models/`.
+writes the FP16 XFeat and LighterGlue graphs for the machine to `reference/uncommitted/models/`:
+the Core ML target on Apple silicon, the TensorRT target elsewhere (`--target native`, also the
+`xfeat-export` default).
+`make export TARGET=tensorrt` or `TARGET=coreml` picks one explicitly.
 `xfeat-export --help` (from `reference/`) covers FP32, the image size, batch sizes and plain TopK.
+
+## Apple silicon
+
+Core ML runs through ONNX Runtime's CoreML execution provider on an export rewritten for it
+(`--target coreml`, the native target on Apple silicon):
+
+```sh
+make setup
+make export TOP_K=2048
+cd backends/ort
+M=../../reference/uncommitted/models
+uv run --frozen xfeat-ort-bench --provider coreml \
+  --xfeat $M/xfeat_1280x960_k2048_b1_fp16_coreml.onnx \
+  --lighterglue $M/lighterglue_k2048_b1_fp16_coreml.onnx --out-dir bench
+uv run --frozen xfeat-ort-predict --provider coreml \
+  --xfeat $M/xfeat_1280x960_k2048_b1_fp16_coreml.onnx \
+  --lighterglue $M/lighterglue_k2048_b1_fp16_coreml.onnx \
+  --manifest pairs.jsonl --resize letterbox --out-dir coreml
+```
+
+XFeat runs on `--xfeat-units ALL` (GPU and Neural Engine) and LighterGlue on
+`--lighterglue-units CPUAndGPU`; the other choices are `CPUAndNeuralEngine` and `CPUOnly`.
+Compiled models are cached in `--cache-dir` (default `uncommitted/coreml-cache`), so the first
+load of a model takes seconds and later loads under 0.1 s.
 
 ## Results
 
@@ -135,7 +166,7 @@ the TensorRT backend pick the batch size per model on this machine:
 
 ```sh
 cd reference
-uv run --frozen xfeat-export --top-k 2048 --chunked-topk --precision fp16 \
+uv run --frozen xfeat-export --target tensorrt --top-k 2048 --chunked-topk --precision fp16 \
   --batch 1 2 4 8 16 32 --out-dir uncommitted/ladder
 cd ../backends/tensorrt
 uv run --frozen xfeat-trt-calibrate --models ../../reference/uncommitted/ladder

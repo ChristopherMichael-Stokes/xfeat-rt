@@ -7,7 +7,7 @@ import pytest
 import torch
 from onnx import TensorProto
 
-from xfeat_export.cli import export_lighterglue, export_xfeat
+from xfeat_export.cli import Target, export_lighterglue, export_xfeat
 from xfeat_export.precision import Precision
 from xfeat_reference.pipeline import GridNormalisation, ReferenceConfig, ReferencePipeline
 
@@ -46,6 +46,7 @@ def test_xfeat_weights_follow_precision_and_io_stays_fp32(
         batch=1,
         chunking=None,
         precision=precision,
+        target=Target.TENSORRT,
     )
     model = onnx.load(str(path))
     assert (TensorProto.FLOAT16 in _tensor_types(model)) == (precision is Precision.FP16)
@@ -64,6 +65,7 @@ def test_lighterglue_fp16_keeps_assignment_head_fp32(
         width=WIDTH,
         height=HEIGHT,
         precision=Precision.FP16,
+        target=Target.TENSORRT,
     )
     model = onnx.load(str(path))
     assert {TensorProto.FLOAT16, TensorProto.FLOAT} <= _tensor_types(model)

@@ -37,6 +37,11 @@ preprocessed once and the model inputs persisted in a gitignored `uncommitted/` 
 
 The workspaces meet through exported model files and prediction directories. The contract test
 exports with `reference`, loads with a backend and reads the backend's predictions back.
+The export has one target per runtime, `tensorrt` (default) and `coreml`, recorded as the `target`
+metadata key. The Core ML target rewrites ops the ONNX Runtime CoreML execution provider rejects
+into exact equivalents (`xfeat_export/coreml_graph.py`); `backends/ort` runs it with
+`--provider coreml`.
+
 `xfeat-evaluation` consumes `runtime/packages/xfeat-pairs` by path (pure Python, no torch) to read
 predictions and manifests; `reference/` pins `numpy<2.4` for GlueFactory, which overrides the
 runtime packages' own numpy floor there.

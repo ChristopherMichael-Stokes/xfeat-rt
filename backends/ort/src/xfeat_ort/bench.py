@@ -7,7 +7,7 @@ import numpy as np
 
 from xfeat_bench.timing import measure, write_results
 from xfeat_core.features import Features
-from xfeat_ort.models import LighterGlueModel, XFeatModel
+from xfeat_ort.options import add_model_arguments, load_models, provider_settings
 
 RANDOM_SEED = 0
 
@@ -22,18 +22,15 @@ def _random_features(count: int, size: tuple[int, int], rng: np.random.Generator
 def main() -> None:
     """Entry point of `xfeat-ort-bench`."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--xfeat", type=Path, required=True)
-    parser.add_argument("--lighterglue", type=Path, required=True)
+    add_model_arguments(parser)
     parser.add_argument("--image", type=Path, help=".npy gray image; random noise if omitted")
-    parser.add_argument("--threads", type=int, default=0)
     parser.add_argument("--warmup", type=int, default=5)
     parser.add_argument("--runs", type=int, default=30)
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args()
 
     rng = np.random.default_rng(RANDOM_SEED)
-    xfeat = XFeatModel(args.xfeat, args.threads)
-    lighterglue = LighterGlueModel(args.lighterglue, args.threads)
+    xfeat, lighterglue = load_models(args)
     meta = xfeat.metadata
     shape = (meta.batch, 1, meta.height, meta.width)
     images = (
@@ -44,7 +41,12 @@ def main() -> None:
     size = (meta.width, meta.height)
     first = lighterglue.pad(_random_features(lighterglue.metadata.top_k, size, rng))
     second = lighterglue.pad(_random_features(lighterglue.metadata.top_k, size, rng))
-    settings = {"threads": str(args.threads), "top_k": str(meta.top_k), "batch": str(meta.batch)}
+    settings = {
+        "threads": str(args.threads),
+        "top_k": str(meta.top_k),
+        "batch": str(meta.batch),
+        **provider_settings(args),
+    }
 
     results = [
         measure(

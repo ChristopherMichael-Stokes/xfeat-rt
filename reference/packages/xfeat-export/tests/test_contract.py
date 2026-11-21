@@ -16,7 +16,7 @@ import numpy.typing as npt
 import pytest
 import torch
 
-from xfeat_export.cli import export_lighterglue, export_xfeat
+from xfeat_export.cli import Target, export_lighterglue, export_xfeat
 from xfeat_export.precision import Precision
 from xfeat_export.xfeat_graph import DEFAULT_CHUNKING, ChunkedTopK
 from xfeat_pairs.predictions import read_index, read_pair
@@ -58,14 +58,25 @@ CASES = [Case(2048, None), Case(2048, DEFAULT_CHUNKING), Case(4096, DEFAULT_CHUN
 @dataclass(frozen=True)
 class Backend:
     name: str
+    directory: str
     predict_command: str
+    target: Target
+    predict_arguments: tuple[str, ...] = ()
 
     @property
     def project(self) -> Path:
-        return REPOSITORY_ROOT / "backends" / self.name
+        return REPOSITORY_ROOT / "backends" / self.directory
 
 
-BACKENDS = [Backend("ort", "xfeat-ort-predict"), Backend("tensorrt", "xfeat-trt-predict")]
+ORT = Backend("ort", "ort", "xfeat-ort-predict", Target.TENSORRT)
+TENSORRT = Backend("tensorrt", "tensorrt", "xfeat-trt-predict", Target.TENSORRT)
+ORT_COREML = Backend(
+    "ort-coreml", "ort", "xfeat-ort-predict", Target.COREML, ("--provider", "coreml")
+)
+PARAMS = [
+    *itertools.product([ORT, TENSORRT], CASES),
+    (ORT_COREML, Case(2048, DEFAULT_CHUNKING)),
+]
 
 
 @dataclass(frozen=True)
@@ -114,6 +125,21 @@ def _load_backend_pairs(directory: Path) -> list[BackendPair]:
     return pairs
 
 
+def _ort_has_coreml() -> bool:
+    """Whether the ORT backend's environment offers the Core ML execution provider."""
+    code = (
+        "import onnxruntime; "
+        "print('CoreMLExecutionProvider' in onnxruntime.get_available_providers())"
+    )
+    result = subprocess.run(  # noqa: S603  # fixed argv, no shell
+        ["uv", "run", "--frozen", "--project", str(ORT.project), "python", "-c", code],  # noqa: S607
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip() == "True"
+
+
 def _gray_image(name: str) -> npt.NDArray[np.float32]:
     rgb = cv2.imread(str(MEGADEPTH / "images" / name), cv2.IMREAD_COLOR_RGB)
     assert rgb is not None, f"missing MegaDepth-1500 image {name}; run xfeat-megadepth1500 once"
@@ -123,13 +149,15 @@ def _gray_image(name: str) -> npt.NDArray[np.float32]:
 
 @pytest.fixture(
     scope="module",
-    params=list(itertools.product(BACKENDS, CASES)),
+    params=PARAMS,
     ids=lambda param: f"{param[0].name}-k{param[1].top_k}{'-chunked' if param[1].chunking else ''}",
 )
 def outcome(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFactory) -> Outcome:
     backend, case = request.param
     assert isinstance(backend, Backend)
     assert isinstance(case, Case)
+    if backend.target is Target.COREML and not _ort_has_coreml():
+        pytest.skip("onnxruntime has no CoreMLExecutionProvider on this machine")
     work = tmp_path_factory.mktemp(f"{backend.name}-k{case.top_k}-{bool(case.chunking)}")
     torch.use_deterministic_algorithms(mode=True)
     config = ReferenceConfig(GridNormalisation.PIXEL_CENTRE, pruning=False, top_k=case.top_k)
@@ -143,6 +171,7 @@ def outcome(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFac
         batch=1,
         chunking=case.chunking,
         precision=Precision.FP32,
+        target=backend.target,
     )
     lighterglue_path = export_lighterglue(
         pipeline.lighterglue_network,
@@ -152,6 +181,7 @@ def outcome(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFac
         width=WIDTH,
         height=HEIGHT,
         precision=Precision.FP32,
+        target=backend.target,
     )
 
     names = [
@@ -197,6 +227,7 @@ def outcome(request: pytest.FixtureRequest, tmp_path_factory: pytest.TempPathFac
             "stretch",
             "--out-dir",
             str(work / "predictions"),
+            *backend.predict_arguments,
         ],
         check=True,
     )

@@ -36,7 +36,7 @@ Run from the repo root unless a workspace is named.
 | What                         | Command                                                |
 | ---------------------------- | ------------------------------------------------------ |
 | Install prek for the git hook (once) | `uv tool install prek@0.5.7`                   |
-| Sync both workspaces, hooks  | `make setup`                                           |
+| Sync workspaces, the machine's backends, hooks | `make setup` (`ort` on macOS arm64; `ort tensorrt` on Linux x86_64/aarch64; override with `BACKENDS="..."`) |
 | All checks                   | `make check`                                           |
 | Checks for one workspace     | `uvx prek@0.5.7 run --all-files runtime/`              |
 | Update hook revisions        | `make update-hooks` (skips releases under 7 days old)  |
@@ -44,10 +44,12 @@ Run from the repo root unless a workspace is named.
 | Add a dependency to a member | `uv add --package <dist-name> <dep>` from the workspace |
 | All tests                    | `make test`                                            |
 | Reference tests (incl. contract test) | `uv run --frozen pytest packages` from `reference/` |
-| Export models                | `make export TOP_K=2048` (FP16 chunked TopK graphs for TensorRT, into `reference/uncommitted/models/`); `xfeat-export --help` from `reference/` for FP32 or plain TopK |
+| Export models                | `make export TOP_K=2048` (FP16 chunked TopK graphs into `reference/uncommitted/models/`; `--target native`: Core ML on Apple silicon, TensorRT elsewhere; `TARGET=tensorrt` or `TARGET=coreml` to pick); `xfeat-export --help` from `reference/` for FP32 or plain TopK |
 | CPU latency                  | `uv run --frozen xfeat-ort-bench --help` from `backends/ort/` |
+| Core ML latency (Apple silicon) | `uv run --frozen xfeat-ort-bench --provider coreml --xfeat <..._coreml.onnx> --lighterglue <..._coreml.onnx> --out-dir <dir>` from `backends/ort/` (`--xfeat-units`, `--lighterglue-units`, `--cache-dir`) |
+| Core ML predictions          | `uv run --frozen xfeat-ort-predict --provider coreml --xfeat <..._coreml.onnx> --lighterglue <..._coreml.onnx> --manifest <pairs.jsonl> --resize letterbox --out-dir <dir>` from `backends/ort/` |
 | CUDA latency                 | `uv run --frozen xfeat-trt-bench --help` from `backends/tensorrt/` (export with `--chunked-topk`; plain TopK costs ~5 ms on TensorRT) |
-| Batch ladder export          | `xfeat-export --chunked-topk --precision fp16 --batch 1 2 4 8 16 32 --out-dir <dir>` from `reference/`; one resolution, K and precision per directory |
+| Batch ladder export          | `xfeat-export --target tensorrt --chunked-topk --precision fp16 --batch 1 2 4 8 16 32 --out-dir <dir>` from `reference/`; one resolution, K and precision per directory |
 | CUDA batch-size calibration  | `uv run --frozen xfeat-trt-calibrate --models <ladder dir>` from `backends/tensorrt/` (stored per device, driver, TensorRT, build options and ONNX hashes; a second call reads it) |
 | CUDA inference-only pair throughput (development only) | `uv run --frozen python scripts/bench_pairs.py --models <ladder dir> --manifest <pairs.jsonl> --resize letterbox --input-store uncommitted/inputs --out-dir <dir>` from `backends/tensorrt/` (model inputs persisted by `scripts/input_store.py`; times model calls only: per pair at batch 1 with and without CUDA graphs, and every XFeat batch size of the ladder) |
 | CUDA batch predictions       | `uv run --frozen xfeat-trt-predict-batch --models <ladder dir> ...` from `backends/tensorrt/` (`--help`; calibrates on a miss) |

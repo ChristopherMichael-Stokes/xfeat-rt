@@ -5,10 +5,13 @@ batch-size calibration sweeps.
 """
 
 import argparse
+import platform
+from enum import StrEnum
 from pathlib import Path
 
 import torch
 
+from xfeat_export.coreml_graph import CoreMLLighterGlue, CoreMLXFeat
 from xfeat_export.lighterglue_graph import StaticLighterGlue
 from xfeat_export.metadata import git_description
 from xfeat_export.onnx_export import export_model
@@ -27,8 +30,28 @@ KEYPOINT_COORDINATES = 2
 DESCRIPTOR_DIMENSION = 64
 
 
-def _suffix(precision: Precision) -> str:
-    return "" if precision is Precision.FP32 else f"_{precision}"
+class Target(StrEnum):
+    """Runtime the exported graph is rewritten for."""
+
+    TENSORRT = "tensorrt"
+    COREML = "coreml"
+
+
+NATIVE_TARGET = "native"
+"""`--target` value that resolves to the target of the machine running the export."""
+
+
+def native_target() -> Target:
+    """Core ML on Apple silicon, where the Core ML graphs measured fastest; TensorRT elsewhere."""
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        return Target.COREML
+    return Target.TENSORRT
+
+
+def _suffix(precision: Precision, target: Target) -> str:
+    precision_part = "" if precision is Precision.FP32 else f"_{precision}"
+    target_part = "" if target is Target.TENSORRT else f"_{target}"
+    return precision_part + target_part
 
 
 def export_xfeat(  # noqa: PLR0913  # one parameter per exported shape setting
@@ -41,9 +64,11 @@ def export_xfeat(  # noqa: PLR0913  # one parameter per exported shape setting
     batch: int,
     chunking: ChunkedTopK | None,
     precision: Precision,
+    target: Target,
 ) -> Path:
     """Export the XFeat graph and return its path."""
-    module = StaticXFeat(
+    module_class = CoreMLXFeat if target is Target.COREML else StaticXFeat
+    module = module_class(
         network,
         height=height,
         width=width,
@@ -52,7 +77,7 @@ def export_xfeat(  # noqa: PLR0913  # one parameter per exported shape setting
         chunking=chunking,
         precision=precision,
     )
-    path = out_dir / f"xfeat_{width}x{height}_k{top_k}_b{batch}{_suffix(precision)}.onnx"
+    path = out_dir / f"xfeat_{width}x{height}_k{top_k}_b{batch}{_suffix(precision, target)}.onnx"
     metadata = {
         "model": "xfeat",
         "height": str(height),
@@ -63,6 +88,7 @@ def export_xfeat(  # noqa: PLR0913  # one parameter per exported shape setting
         "grid": str(GRID),
         "topk_mode": "chunked" if chunking else "plain",
         "precision": str(precision),
+        "target": str(target),
         "weights_sha256": XFEAT_WEIGHTS_SHA256,
         "git_hash": git_description(),
     }
@@ -91,10 +117,12 @@ def export_lighterglue(  # noqa: PLR0913  # shape settings of the paired XFeat e
     width: int,
     height: int,
     precision: Precision,
+    target: Target,
 ) -> Path:
     """Export the padded LighterGlue graph and return its path."""
-    module = StaticLighterGlue(network, MATCH_THRESHOLD, precision)
-    path = out_dir / f"lighterglue_k{top_k}_b{batch}{_suffix(precision)}.onnx"
+    module_class = CoreMLLighterGlue if target is Target.COREML else StaticLighterGlue
+    module = module_class(network, MATCH_THRESHOLD, precision)
+    path = out_dir / f"lighterglue_k{top_k}_b{batch}{_suffix(precision, target)}.onnx"
     example: list[torch.Tensor] = []
     names: list[str] = []
     for side in (0, 1):
@@ -111,6 +139,7 @@ def export_lighterglue(  # noqa: PLR0913  # shape settings of the paired XFeat e
         "top_k": str(top_k),
         "match_threshold": str(MATCH_THRESHOLD),
         "precision": str(precision),
+        "target": str(target),
         "pruning": "off",
         "weights_sha256": LIGHTERGLUE_WEIGHTS_SHA256,
         "git_hash": git_description(),
@@ -147,9 +176,17 @@ def main() -> None:
         default=Precision.FP32,
         help="backbone and transformer precision; detection and assignment stay FP32",
     )
+    parser.add_argument(
+        "--target",
+        choices=[*Target, NATIVE_TARGET],
+        default=NATIVE_TARGET,
+        help="runtime the graphs are rewritten for (coreml: ONNX Runtime Core ML provider; "
+        "native: coreml on Apple silicon, tensorrt elsewhere)",
+    )
     parser.add_argument("--out-dir", type=Path, required=True)
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    target = native_target() if args.target == NATIVE_TARGET else Target(args.target)
 
     config = ReferenceConfig(grid=GRID, pruning=False, top_k=args.top_k)
     pipeline = ReferencePipeline(config, torch.device("cpu"))
@@ -165,6 +202,7 @@ def main() -> None:
                 batch=batch,
                 chunking=chunking,
                 precision=args.precision,
+                target=target,
             ),
             export_lighterglue(
                 pipeline.lighterglue_network,
@@ -174,6 +212,7 @@ def main() -> None:
                 width=args.width,
                 height=args.height,
                 precision=args.precision,
+                target=target,
             ),
         ):
             print(path)  # noqa: T201  # CLI output

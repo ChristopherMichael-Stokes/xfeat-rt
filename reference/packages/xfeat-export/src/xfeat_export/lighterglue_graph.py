@@ -32,7 +32,7 @@ def masked_attention(
     return torch.matmul(similarity.softmax(-1), value)
 
 
-def _tensor(value: object) -> torch.Tensor:
+def as_tensor(value: object) -> torch.Tensor:
     """Narrow the untyped output of an upstream module to `Tensor`."""
     if not isinstance(value, torch.Tensor):
         msg = f"expected a Tensor, got {type(value).__name__}"
@@ -41,7 +41,7 @@ def _tensor(value: object) -> torch.Tensor:
 
 
 def _split_heads(x: torch.Tensor, heads: int) -> torch.Tensor:
-    return _tensor(x.unflatten(-1, (heads, -1))).transpose(1, 2)
+    return as_tensor(x.unflatten(-1, (heads, -1))).transpose(1, 2)
 
 
 class StaticLighterGlue(nn.Module):
@@ -70,6 +70,26 @@ class StaticLighterGlue(nn.Module):
         self.compute_dtype = precision.dtype
         self.match_threshold = match_threshold
 
+    def _encode(self, keypoints: torch.Tensor, image_size: torch.Tensor) -> torch.Tensor:
+        """Positional encoding of `keypoints`, in the compute dtype."""
+        encoding = self.lightglue.posenc(normalize_keypoints(keypoints, image_size))
+        return as_tensor(encoding).to(self.compute_dtype)
+
+    def _query_key_value(
+        self,
+        block: Any,  # noqa: ANN401  # kornia SelfBlock
+        x: torch.Tensor,
+        encoding: torch.Tensor,
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Per-head query and key with rotary encoding applied, and value."""
+        qkv = as_tensor(block.Wqkv(x).unflatten(-1, (block.num_heads, -1, 3))).transpose(1, 2)
+        query, key, value = qkv[..., 0], qkv[..., 1], as_tensor(qkv[..., 2])
+        return (
+            apply_cached_rotary_emb(encoding, query),
+            apply_cached_rotary_emb(encoding, key),
+            value,
+        )
+
     def _self_block(
         self,
         block: Any,  # noqa: ANN401  # kornia SelfBlock
@@ -77,13 +97,10 @@ class StaticLighterGlue(nn.Module):
         encoding: torch.Tensor,
         bias: torch.Tensor,
     ) -> torch.Tensor:
-        qkv = block.Wqkv(x).unflatten(-1, (block.num_heads, -1, 3)).transpose(1, 2)
-        query, key, value = qkv[..., 0], qkv[..., 1], qkv[..., 2]
-        query = apply_cached_rotary_emb(encoding, query)
-        key = apply_cached_rotary_emb(encoding, key)
+        query, key, value = self._query_key_value(block, x, encoding)
         context = masked_attention(query, key, value, bias)
         message = block.out_proj(context.transpose(1, 2).flatten(start_dim=-2))
-        return x + _tensor(block.ffn(torch.cat([x, message], -1)))
+        return x + as_tensor(block.ffn(torch.cat([x, message], -1)))
 
     def _cross_block(
         self,
@@ -103,8 +120,8 @@ class StaticLighterGlue(nn.Module):
             block.to_out(m.transpose(1, 2).flatten(start_dim=-2)) for m in (message0, message1)
         )
         return (
-            x0 + _tensor(block.ffn(torch.cat([x0, message0], -1))),
-            x1 + _tensor(block.ffn(torch.cat([x1, message1], -1))),
+            x0 + as_tensor(block.ffn(torch.cat([x0, message0], -1))),
+            x1 + as_tensor(block.ffn(torch.cat([x1, message1], -1))),
         )
 
     @override
@@ -122,8 +139,7 @@ class StaticLighterGlue(nn.Module):
         """Run the matcher."""
         net = self.lightglue
         dtype = self.compute_dtype
-        encoding0 = net.posenc(normalize_keypoints(kpts0, size0)).to(dtype)
-        encoding1 = net.posenc(normalize_keypoints(kpts1, size1)).to(dtype)
+        encoding0, encoding1 = self._encode(kpts0, size0), self._encode(kpts1, size1)
         x0, x1 = net.input_proj(desc0.to(dtype)), net.input_proj(desc1.to(dtype))
         bias0 = torch.where(valid0, 0.0, MASK_LOGIT).to(dtype)[:, None, None, :]
         bias1 = torch.where(valid1, 0.0, MASK_LOGIT).to(dtype)[:, None, None, :]
@@ -156,10 +172,23 @@ class StaticLighterGlue(nn.Module):
             + functional.logsigmoid(matchability1).transpose(1, 2)
         )
         scores = torch.where(valid0[:, :, None] & valid1[:, None, :], scores, MASK_LOGIT)
+        best0, best_score0, mutual = self._best_mutual(scores, valid0)
+        return self._thresholded(best0, mutual, best_score0.exp())
+
+    def _best_mutual(
+        self, scores: torch.Tensor, valid0: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        """Best image-1 index and score per image-0 keypoint, and whether each is mutual."""
         best_score0, best0 = scores.max(2)
         best1 = scores.max(1).indices
         mutual = torch.arange(best0.shape[1])[None] == best1.gather(1, best0)
         mutual &= valid0
-        confidence = torch.where(mutual, best_score0.exp(), 0.0)
+        return best0, best_score0, mutual
+
+    def _thresholded(
+        self, best0: torch.Tensor, mutual: torch.Tensor, best_confidence0: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """`m0` and `mscores0` from mutual best matches above the match threshold."""
+        confidence = torch.where(mutual, best_confidence0, 0.0)
         matched = mutual & (confidence > self.match_threshold)
         return torch.where(matched, best0, -1), confidence
