@@ -13,5 +13,18 @@ all = "error"
 [tool.ty.analysis]
 respect-type-ignore-comments = false
 
+[tool.uv]
+# macOS on Apple silicon and Linux on x86_64 and aarch64; nothing else is locked or supported
+environments = [
+  "sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
+required-environments = [
+  "sys_platform == 'darwin' and platform_machine == 'arm64'",
+  "sys_platform == 'linux' and platform_machine == 'x86_64'",
+  "sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
+
 [tool.uv.workspace]
 members = ["packages/*"]

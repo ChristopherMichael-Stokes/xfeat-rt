@@ -15,9 +15,10 @@ uv tool install prek@0.5.7
 make setup
 ```
 
-`make setup` syncs `reference`, `runtime` and the backends with wheels for the machine: `ort` on
-macOS arm64, `ort` and `tensorrt` on Linux x86_64 and aarch64. `make setup BACKENDS="ort"` picks
-them explicitly; `make test` runs the tests of the same backends.
+`make setup` syncs the projects with wheels for the machine: `reference`, `runtime` and `ort` on
+macOS arm64; those plus `tensorrt` on Linux x86_64; `runtime`, `ort` and `tensorrt` on Linux aarch64
+(export and evaluation run on macOS or x86_64). `WORKSPACES="..."` and `BACKENDS="..."` pick them
+explicitly; `make test` runs the tests of the same projects.
 
 ## Checks
 

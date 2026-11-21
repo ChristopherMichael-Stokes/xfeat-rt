@@ -51,5 +51,10 @@ runtime packages' own numpy floor there.
 - **`runtime/` and `backends/` never depend on PyTorch**, directly or transitively.
 - **Exported models are build outputs**, regenerated from `reference` and never committed
   (`.gitignore` covers the usual formats).
+- **Platforms:** `runtime/` and `backends/` install on macOS arm64, Linux x86_64 and Linux aarch64;
+  `reference/` (export and evaluation) on macOS arm64 and Linux x86_64, since poselib ships no
+  Linux aarch64 wheel. Each `pyproject.toml` states its set in `tool.uv.environments` and
+  `required-environments`, so a lock that misses one fails. TensorRT installs only on Linux; its
+  project still syncs on macOS for type checks against `stubs/`.
 - **Python:** 3.13 is the baseline (`.python-version`). `requires-python` stays open-ended
   (`>=3.13`) with no upper bound: the aim is to build on the newest Python every backend supports.

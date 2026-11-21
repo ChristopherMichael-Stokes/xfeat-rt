@@ -36,7 +36,7 @@ Run from the repo root unless a workspace is named.
 | What                         | Command                                                |
 | ---------------------------- | ------------------------------------------------------ |
 | Install prek for the git hook (once) | `uv tool install prek@0.5.7`                   |
-| Sync workspaces, the machine's backends, hooks | `make setup` (`ort` on macOS arm64; `ort tensorrt` on Linux x86_64/aarch64; override with `BACKENDS="..."`) |
+| Sync workspaces, the machine's backends, hooks | `make setup` (macOS arm64: `reference runtime` + `ort`; Linux x86_64: `reference runtime` + `ort tensorrt`; Linux aarch64: `runtime` + `ort tensorrt`; override with `WORKSPACES="..."`, `BACKENDS="..."`) |
 | All checks                   | `make check`                                           |
 | Checks for one workspace     | `uvx prek@0.5.7 run --all-files runtime/`              |
 | Update hook revisions        | `make update-hooks` (skips releases under 7 days old)  |
