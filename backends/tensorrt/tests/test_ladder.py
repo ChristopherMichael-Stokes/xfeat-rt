@@ -7,7 +7,13 @@ import pytest
 from onnx import TensorProto, helper
 from xfeat_trt.ladder import LadderError, find_ladder
 
-COMMON = {"opset": "20", "weights_sha256": "w", "git_hash": "g", "precision": "fp16"}
+COMMON = {
+    "opset": "20",
+    "weights_sha256": "w",
+    "git_hash": "g",
+    "precision": "fp16",
+    "target": "tensorrt",
+}
 XFEAT = {
     **COMMON,
     "model": "xfeat",
